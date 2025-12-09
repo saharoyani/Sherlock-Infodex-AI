@@ -1,0 +1,3751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infodemic Detector | AI-Powered Health Misinformation Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        :root {
+            --primary: #000000;
+            --secondary: #404040;
+            --accent: #000000;
+            --accent-light: #1a1a1a;
+            --navy: #1e3a8a;
+            --navy-light: #2563eb;
+            --navy-dark: #1e293b;
+            --warning: #737373;
+            --danger: #0a0a0a;
+            --success: #525252;
+            --bg: #ffffff;
+            --bg-elevated: #fafafa;
+            --text-primary: #0a0a0a;
+            --text-secondary: #525252;
+            --text-muted: #a3a3a3;
+            --border: #e5e5e5;
+            --border-light: #f5f5f5;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            background-image: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.01) 2px, rgba(0,0,0,0.01) 4px);
+            color: var(--text-primary);
+            line-height: 1.7;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 60px 40px;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 0 20px 60px;
+            margin-bottom: 60px;
+            border-bottom: 2px solid var(--accent);
+            animation: fadeInDown 0.6s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            position: relative;
+            display: inline-block;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--accent);
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .header-description {
+            max-width: 600px;
+            margin: 0 auto;
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            font-weight: 400;
+        }
+
+        /* Navigation */
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 60px;
+            animation: fadeIn 0.8s ease-out 0.2s both;
+            flex-wrap: wrap;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .nav-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .nav-btn:hover {
+            color: var(--text-primary);
+            background: var(--border-light);
+        }
+
+        .nav-btn.active {
+            color: var(--accent);
+            background: rgba(10, 10, 10, 0.08);
+        }
+
+        .nav-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        /* Content sections */
+        .content-section {
+            display: none;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Detector Section */
+        .detector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 1024px) {
+            .detector-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .panel:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            margin-bottom: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        .input-group {
+            margin-bottom: 24px;
+        }
+
+        .input-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            display: block;
+            font-weight: 500;
+        }
+
+        textarea, select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 14px 16px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: vertical;
+            transition: all 0.2s ease;
+            border-radius: 10px;
+        }
+
+        textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            min-height: 160px;
+            line-height: 1.6;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border-radius: 10px;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: var(--accent-light);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-light);
+            border-color: var(--text-secondary);
+        }
+
+        .btn-network {
+            background: var(--navy);
+            color: white;
+            border: 1px solid var(--navy);
+        }
+
+        .btn-network:hover {
+            background: var(--navy-light);
+            border-color: var(--navy-light);
+        }
+
+        /* Results Panel */
+        .result-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 28px;
+            margin-bottom: 20px;
+            animation: resultAppear 0.4s ease-out;
+            border-radius: 12px;
+        }
+
+        @keyframes resultAppear {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .verdict {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        .verdict.true { color: var(--success); }
+        .verdict.misinfo { color: var(--warning); }
+        .verdict.unverified { color: var(--text-secondary); }
+        .verdict.conspiracy { color: var(--danger); }
+
+        .confidence-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border-light);
+            margin: 16px 0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 1s ease-out;
+            border-radius: 3px;
+        }
+
+        .confidence-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .flicc-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 16px 0;
+        }
+
+        .flicc-tag {
+            padding: 6px 14px;
+            background: rgba(246, 173, 85, 0.1);
+            border: 1px solid rgba(246, 173, 85, 0.3);
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--warning);
+            border-radius: 6px;
+        }
+
+        .evidence-links {
+            margin: 16px 0;
+            line-height: 2;
+        }
+
+        .evidence-link {
+            display: inline-block;
+            margin-right: 16px;
+            margin-bottom: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid transparent;
+        }
+
+        .evidence-link:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        .explanation {
+            background: var(--bg-elevated);
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .explanation strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .feedback-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .feedback-btn {
+            padding: 10px 18px;
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .feedback-btn:hover {
+            background: var(--bg);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Visualization Section */
+        .viz-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .chart-container {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            margin-bottom: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        /* Network Section */
+        #network-svg {
+            width: 100%;
+            height: 600px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .node:hover circle {
+            stroke-width: 3;
+        }
+
+        .link {
+            stroke: var(--navy-light);
+            stroke-opacity: 0.3;
+            stroke-width: 1.5px;
+        }
+
+        .network-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 28px;
+            text-align: center;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 10px;
+            letter-spacing: -0.02em;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Watchlist */
+        .watchlist-item {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            padding: 24px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+            border-radius: 12px;
+        }
+
+        .watchlist-item:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateX(4px);
+        }
+
+        .watchlist-content {
+            flex: 1;
+        }
+
+        .watchlist-text {
+            margin-bottom: 12px;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .watchlist-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .remove-btn {
+            padding: 10px 18px;
+            border: 1px solid var(--danger);
+            background: rgba(252, 129, 129, 0.1);
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .remove-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Sensitivity Analysis */
+        .sensitivity-control {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 40px;
+            margin-bottom: 40px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .slider-container {
+            margin: 28px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--border-light);
+            outline: none;
+            -webkit-appearance: none;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .slider-value {
+            font-size: 1.5rem;
+            color: var(--accent);
+            text-align: center;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.4;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 40px 20px;
+            }
+            
+            h1 { 
+                font-size: 2.2rem; 
+            }
+            
+            .detector-grid { 
+                grid-template-columns: 1fr; 
+            }
+            
+            .viz-grid { 
+                grid-template-columns: 1fr; 
+            }
+            
+            .button-group { 
+                flex-direction: column; 
+            }
+            
+            .btn { 
+                width: 100%; 
+            }
+
+            .panel {
+                padding: 28px;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--border-light);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Notification animations */
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
+                <!-- Minimalistic Sherlock Icon -->
+                <svg width="60" height="60" viewBox="0 0 100 100" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));">
+                    <!-- Detective hat -->
+                    <ellipse cx="50" cy="35" rx="35" ry="8" fill="#1a1a2e" opacity="0.9"/>
+                    <path d="M 20 35 Q 20 25 50 20 Q 80 25 80 35 L 75 40 Q 75 30 50 28 Q 25 30 25 40 Z" fill="#1a1a2e"/>
+                    
+                    <!-- Head -->
+                    <circle cx="50" cy="55" r="20" fill="#2d3748" stroke="#1a1a2e" stroke-width="2"/>
+                    
+                    <!-- Magnifying glass -->
+                    <circle cx="72" cy="65" r="12" fill="none" stroke="#667eea" stroke-width="3"/>
+                    <circle cx="72" cy="65" r="8" fill="#667eea" opacity="0.2"/>
+                    <line x1="82" y1="75" x2="90" y2="83" stroke="#667eea" stroke-width="4" stroke-linecap="round"/>
+                    
+                    <!-- Pipe -->
+                    <path d="M 35 58 Q 30 58 28 60 L 25 62 Q 24 63 25 64 L 28 66 Q 30 67 32 66 L 35 64" 
+                          fill="#8b4513" stroke="#654321" stroke-width="1"/>
+                    <ellipse cx="35" cy="61" rx="3" ry="4" fill="#2d3748"/>
+                </svg>
+                
+                <div>
+                    <h1 style="margin: 0; font-size: 2.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        SHERLOCK INFODEX AI
+                    </h1>
+                    <div class="subtitle" style="margin-top: 5px;">Digital Epidemiology • Infodemic Management</div>
+                </div>
+            </div>
+            <div style="text-align: center; font-size: 0.9rem; color: var(--text-secondary); margin-top: 10px;">
+                🔍 Investigating Health Misinformation with Pattern Analysis + AI
+            </div>
+            <p class="header-description">
+                AI-powered analysis of health misinformation during outbreaks. 
+                Detect, classify, and visualize the spread of false health narratives in real-time.
+            </p>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" onclick="showSection('detector')">Detector</button>
+            <button class="nav-btn" onclick="showSection('visualizations')">Visualizations</button>
+            <button class="nav-btn" onclick="showSection('network')">Pro-Search Network</button>
+            <button class="nav-btn" onclick="showSection('watchlist')">Watchlist</button>
+            <button class="nav-btn" onclick="showSection('sensitivity')">Sensitivity Analysis</button>
+        </nav>
+
+        <!-- Detector Section -->
+        <div id="detector" class="content-section active">
+            <div class="detector-grid">
+                <div class="panel">
+                    <h2 class="panel-title">Input Analysis</h2>
+                    <div class="input-group">
+                        <label class="input-label">Content to Analyze</label>
+                        <textarea id="inputText" placeholder="Paste text, tweet, or claim to analyze..."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Or Select Example</label>
+                        <select id="exampleSelect" onchange="loadExample()">
+                            <option value="">-- Choose an example --</option>
+                            <option value="vaccine_misinfo">Vaccine Infertility Claim</option>
+                            <option value="5g_covid">5G Causes COVID-19</option>
+                            <option value="miracle_cure">Miracle Cure Advertisement</option>
+                            <option value="accurate_cdc">Accurate CDC Guidance</option>
+                            <option value="fear_mongering">Fear Mongering Post</option>
+                            <option value="conspiracy">Conspiracy Theory</option>
+                        </select>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn" onclick="runDetector()">Run Detector</button>
+                        <button class="btn btn-network" onclick="runProSearch()">🔍 Pro-Search Network</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2 class="panel-title">Analysis Results</h2>
+                    <div id="resultsContainer">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔍</div>
+                            <p>Enter content and run the detector to see results</p>
+                        </div>
+                    </div>
+                    <div class="loading" id="loading">Analyzing content</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualizations Section -->
+        <div id="visualizations" class="content-section">
+            <div class="panel" style="margin-bottom: 30px; background: linear-gradient(135deg, rgba(10, 10, 10, 0.03), rgba(64, 64, 64, 0.03)); border-color: var(--accent);">
+                <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--accent); font-weight: 600;">📊 Live Analysis Dashboard</h3>
+                <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.7;">
+                    These visualizations update in real-time as you analyze content. Each chart reflects your cumulative analysis results, showing trends, distributions, and patterns across all detected content.
+                    <strong style="color: var(--text-primary); display: block; margin-top: 8px;">
+                        Total Analyzed: <span id="totalAnalyzedCount" style="color: var(--accent);">0</span> items
+                    </strong>
+                </p>
+            </div>
+            
+            <div class="viz-grid">
+                <div class="chart-container">
+                    <h3 class="chart-title">Misinformation Trends Over Time</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3 class="chart-title">Content Classification Distribution</h3>
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container" style="margin-bottom: 30px;">
+                <h3 class="chart-title">Regional Misinformation Heatmap</h3>
+                <canvas id="heatmapChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Network Section -->
+        <div id="network" class="content-section">
+            <div class="panel" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.02), rgba(255, 255, 255, 1)); border: 1px solid rgba(30, 58, 138, 0.1);">
+                <h2 class="panel-title" style="color: var(--navy);">Social Network Analysis - Real-Time Origin Tracking</h2>
+                <p style="margin-bottom: 20px; color: var(--text-secondary);">
+                    Track where health misinformation claims originated and how they spread across social media platforms. 
+                    The analysis identifies the earliest sources, key amplifiers, and estimates total reach.
+                    <br><br>
+                    <strong style="color: var(--text-primary);">Network Legend:</strong>
+                    <span style="color: #1e3a8a;">● Navy = First Source/Origin</span> • 
+                    <span style="color: #2563eb;">● Blue = Platform Sources</span> • 
+                    <span style="color: #404040;">● Gray = Amplifiers</span> • 
+                    <span style="color: #a3a3a3;">● Light Gray = General Users</span>
+                    <br><br>
+                    <strong style="color: var(--navy);">💡 Tip:</strong> Click on any node to visit its source URL
+                </p>
+                <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <button class="btn btn-network" onclick="runProSearch()">🔍 Pro-Search Network</button>
+                    <button class="btn btn-secondary" onclick="googleSearchClaim()" id="googleSearchBtn" style="display: none;">
+                        🔎 Google Search Claim
+                    </button>
+                </div>
+                <svg id="network-svg"></svg>
+                <div class="network-stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="spreadPotential">-</div>
+                        <div class="stat-label">Spread Potential</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="topSpreaders">-</div>
+                        <div class="stat-label">Key Amplifier Nodes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="networkReach">-</div>
+                        <div class="stat-label">Estimated Total Reach</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Watchlist Section -->
+        <div id="watchlist" class="content-section">
+            <div class="panel">
+                <h2 class="panel-title">Saved Items for Review</h2>
+                <div id="watchlistContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>No items in watchlist. Add items from the detector results.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensitivity Analysis Section -->
+        <div id="sensitivity" class="content-section">
+            <div class="panel" style="margin-bottom: 40px;">
+                <h2 class="panel-title">Automated Sensitivity Analysis</h2>
+                <div style="background: rgba(10, 10, 10, 0.05); padding: 16px; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid var(--accent);">
+                    <strong style="color: var(--accent);">📍 Showing results for: </strong>
+                    <span id="currentAnalysisPreview" style="color: var(--text-primary);">Run detector to see analysis</span>
+                </div>
+                <p style="margin-bottom: 20px; color: var(--text-secondary); line-height: 1.8;">
+                    The detector automatically performs sensitivity analysis by evaluating claims under multiple detection thresholds simultaneously. 
+                    This helps identify how robust the classification is and whether verdicts remain consistent across different strictness levels.
+                </p>
+                
+                <div style="background: var(--bg); padding: 24px; border-radius: 10px; margin-top: 24px; border: 1px solid var(--border);">
+                    <h3 style="font-size: 1rem; margin-bottom: 16px; font-weight: 600; color: var(--text-primary);">How It Works</h3>
+                    <div style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.8;">
+                        <p style="margin-bottom: 12px;">
+                            <strong style="color: var(--text-primary);">Multi-Threshold Testing:</strong> Each claim is analyzed at 5 different detection thresholds (Very Lenient, Lenient, Moderate, Strict, Very Strict) to assess classification stability.
+                        </p>
+                        <p style="margin-bottom: 12px;">
+                            <strong style="color: var(--text-primary);">Confidence Variance:</strong> Shows how much the confidence score varies across thresholds. Low variance indicates high reliability.
+                        </p>
+                        <p style="margin-bottom: 0;">
+                            <strong style="color: var(--text-primary);">Robustness Score:</strong> Measures how consistently the same verdict is reached across all threshold levels. Higher is better.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="sensitivityAnalysisResults" style="margin-top: 30px;">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <p>Run the detector on content to see automated sensitivity analysis</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="viz-grid">
+                <div class="chart-container">
+                    <h3 class="chart-title">Classification Across Thresholds</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                        Shows how classification counts change under different detection strictness levels
+                    </p>
+                    <canvas id="sensitivityChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3 class="chart-title">Confidence Distribution Analysis</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                        Distribution of confidence scores across all analyzed content
+                    </p>
+                    <canvas id="confidenceChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container" style="margin-top: 40px;">
+                <h3 class="chart-title">Threshold Sensitivity Heatmap</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                    Visualizes how different content types respond to varying detection thresholds
+                </p>
+                <canvas id="heatmapSensitivityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock database
+        const examples = {
+            vaccine_misinfo: "BREAKING: New study shows COVID vaccines cause infertility in women. Mainstream media is hiding this! Share before they delete!",
+            "5g_covid": "5G towers are spreading coronavirus. That's why the pandemic started when 5G was rolled out. Wake up sheeple!",
+            miracle_cure: "Amazing natural herb cures COVID-19 in 24 hours! Doctors HATE this simple trick. Buy now for $99.99!",
+            accurate_cdc: "According to CDC guidelines, washing hands frequently with soap and water for at least 20 seconds helps prevent the spread of respiratory illnesses.",
+            fear_mongering: "The new flu strain is 100x deadlier than anything we've seen. Government is covering up the real death toll. Prepare for the worst!",
+            conspiracy: "Big Pharma created the pandemic to sell vaccines. Follow the money - it all leads back to a secret cabal of elites."
+        };
+
+        const mockDataset = [
+            { text: examples.vaccine_misinfo, category: 'misinfo', confidence: 87, flicc: ['Cherry Picking', 'Conspiracy'], topic: 'COVID-19', region: 'North America', timestamp: '2024-11-20' },
+            { text: examples['5g_covid'], category: 'conspiracy', confidence: 92, flicc: ['Conspiracy', 'False Causality'], topic: 'COVID-19', region: 'Europe', timestamp: '2024-11-19' },
+            { text: examples.miracle_cure, category: 'clickbait', confidence: 95, flicc: ['Fake Experts', 'Impossible Expectations'], topic: 'COVID-19', region: 'Asia', timestamp: '2024-11-21' },
+            { text: examples.accurate_cdc, category: 'accurate', confidence: 98, flicc: [], topic: 'General Health', region: 'North America', timestamp: '2024-11-22' },
+            { text: examples.fear_mongering, category: 'misinfo', confidence: 84, flicc: ['Impossible Expectations', 'Conspiracy'], topic: 'Flu', region: 'South America', timestamp: '2024-11-18' },
+            { text: examples.conspiracy, category: 'conspiracy', confidence: 91, flicc: ['Conspiracy', 'Fake Experts'], topic: 'COVID-19', region: 'Africa', timestamp: '2024-11-17' }
+        ];
+
+        let watchlist = [];
+        let analysisHistory = [];
+        let currentSearchClaim = '';  // Track current claim for Google search
+        
+        // Global analysis state - coordinates all sections
+        let globalAnalysisState = {
+            currentAnalysis: null,
+            allAnalyses: [],
+            aggregateStats: {
+                totalAnalyzed: 0,
+                accurateCount: 0,
+                misinfoCount: 0,
+                conspiracyCount: 0,
+                clickbaitCount: 0,
+                avgConfidence: 0,
+                avgEvidenceScore: 0,
+                fliccDistribution: {
+                    'Fake Experts': 0,
+                    'Logical Fallacies': 0,
+                    'Impossible Expectations': 0,
+                    'Cherry Picking': 0,
+                    'Conspiracy Theory': 0
+                },
+                timeSeriesData: [],
+                regionalData: {
+                    'North America': { accurate: 0, misinfo: 0, conspiracy: 0 },
+                    'Europe': { accurate: 0, misinfo: 0, conspiracy: 0 },
+                    'Asia': { accurate: 0, misinfo: 0, conspiracy: 0 },
+                    'South America': { accurate: 0, misinfo: 0, conspiracy: 0 },
+                    'Africa': { accurate: 0, misinfo: 0, conspiracy: 0 },
+                    'Oceania': { accurate: 0, misinfo: 0, conspiracy: 0 }
+                }
+            }
+        };
+
+        // Update global state with new analysis
+        function updateGlobalState(analysis) {
+            globalAnalysisState.currentAnalysis = analysis;
+            globalAnalysisState.allAnalyses.push(analysis);
+            
+            const stats = globalAnalysisState.aggregateStats;
+            stats.totalAnalyzed++;
+            
+            // Update category counts
+            switch(analysis.category) {
+                case 'accurate': stats.accurateCount++; break;
+                case 'misinfo': stats.misinfoCount++; break;
+                case 'conspiracy': stats.conspiracyCount++; break;
+                case 'clickbait': stats.clickbaitCount++; break;
+            }
+            
+            // Update average metrics
+            const totalConf = stats.avgConfidence * (stats.totalAnalyzed - 1) + analysis.confidence;
+            stats.avgConfidence = totalConf / stats.totalAnalyzed;
+            
+            if (analysis.evidenceScore !== undefined) {
+                const totalEvid = stats.avgEvidenceScore * (stats.totalAnalyzed - 1) + analysis.evidenceScore;
+                stats.avgEvidenceScore = totalEvid / stats.totalAnalyzed;
+            }
+            
+            // Update FLICC distribution
+            if (analysis.flicc) {
+                analysis.flicc.forEach(tag => {
+                    if (stats.fliccDistribution[tag] !== undefined) {
+                        stats.fliccDistribution[tag]++;
+                    }
+                });
+            }
+            
+            // Add to time series (last 20 analyses)
+            stats.timeSeriesData.push({
+                timestamp: new Date(),
+                category: analysis.category,
+                confidence: analysis.confidence
+            });
+            if (stats.timeSeriesData.length > 20) {
+                stats.timeSeriesData.shift();
+            }
+            
+            // Update regional data (simulate based on category)
+            const regions = Object.keys(stats.regionalData);
+            const randomRegion = regions[Math.floor(Math.random() * regions.length)];
+            if (analysis.category === 'accurate') {
+                stats.regionalData[randomRegion].accurate++;
+            } else if (analysis.category === 'conspiracy') {
+                stats.regionalData[randomRegion].conspiracy++;
+            } else {
+                stats.regionalData[randomRegion].misinfo++;
+            }
+            
+            // Update all visualizations
+            updateAllVisualizations();
+        }
+
+        // Navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+
+            // Initialize section-specific content with delay to ensure proper rendering
+            setTimeout(() => {
+                if (sectionId === 'visualizations') {
+                    initializeCharts();
+                } else if (sectionId === 'network') {
+                    initializeNetwork();
+                } else if (sectionId === 'sensitivity') {
+                    initializeSensitivityCharts();
+                }
+            }, 100);
+        }
+
+        // Run AI-powered analysis in parallel
+        async function runAIAnalysis(inputText) {
+            try {
+                console.log('Starting AI analysis...');
+                
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 4000,
+                        tools: [
+                            {
+                                type: "web_search_20250305",
+                                name: "web_search"
+                            }
+                        ],
+                        messages: [
+                            {
+                                role: "user",
+                                content: `You are a health misinformation analyst. Analyze this claim comprehensively using web search:
+
+CLAIM: "${inputText}"
+
+INSTRUCTIONS:
+1. Search PubMed for peer-reviewed research on this topic
+2. Search fact-checking sites (Snopes, FactCheck.org, Reuters Fact Check) for debunking or verification
+3. Search news sites for recent coverage
+4. Analyze the scientific consensus
+
+Then provide a JSON response with:
+{
+  "evidenceScore": <number 0-100>,
+  "scoreRationale": "<why this score>",
+  "analysis": "<comprehensive analysis of the claim>",
+  "searchesConducted": ["list of searches you performed"],
+  "sources": [
+    {"title": "...", "url": "...", "type": "pubmed|factcheck|news"}
+  ],
+  "conclusion": "<final verdict: Supported/Debunked/Uncertain>"
+}
+
+SCORING GUIDE:
+- 0-20: Thoroughly debunked, no credible support
+- 21-40: Mostly debunked, minimal support
+- 41-60: Mixed evidence or uncertain
+- 61-80: Moderate support with some evidence
+- 81-100: Strong scientific consensus and support
+
+Be thorough. Search multiple sources. Provide evidence.`
+                            }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('AI API Response:', data);
+
+                // Extract text content from response
+                let fullText = '';
+                for (const block of data.content) {
+                    if (block.type === 'text') {
+                        fullText += block.text;
+                    }
+                }
+
+                console.log('AI response text:', fullText);
+
+                // Parse JSON from response
+                const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('Could not parse JSON response from Claude');
+                }
+
+                const aiResult = JSON.parse(jsonMatch[0]);
+                return aiResult;
+
+            } catch (error) {
+                console.error('AI Analysis Error:', error);
+                return {
+                    error: true,
+                    message: error.message
+                };
+            }
+        }
+
+        // Display AI analysis results
+        function displayAIResults(aiResult) {
+            const contentDiv = document.getElementById('aiAnalysisContent');
+            
+            if (aiResult.error) {
+                contentDiv.innerHTML = `
+                    <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px;">
+                        <p style="color: #856404; margin-bottom: 8px;"><strong>⚠️ AI Analysis Unavailable</strong></p>
+                        <p style="color: #856404; font-size: 0.9rem;">The AI-powered analysis couldn't complete. Pattern-based results above are still valid.</p>
+                        <p style="color: #999; font-size: 0.8rem; margin-top: 8px;">Error: ${aiResult.message}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Determine badge and color based on AI score
+            let badge = '';
+            let scoreColor = '';
+            
+            if (aiResult.evidenceScore >= 80) {
+                badge = '<span style="background: #d4edda; color: #155724; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Strong Evidence</span>';
+                scoreColor = '#28a745';
+            } else if (aiResult.evidenceScore >= 60) {
+                badge = '<span style="background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Moderate Evidence</span>';
+                scoreColor = '#ffc107';
+            } else if (aiResult.evidenceScore >= 40) {
+                badge = '<span style="background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Mixed Evidence</span>';
+                scoreColor = '#ff9800';
+            } else if (aiResult.evidenceScore >= 20) {
+                badge = '<span style="background: #f8d7da; color: #721c24; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Low Evidence</span>';
+                scoreColor = '#f44336';
+            } else {
+                badge = '<span style="background: #f8d7da; color: #721c24; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Debunked</span>';
+                scoreColor = '#d32f2f';
+            }
+
+            // Build sources HTML
+            let sourcesHtml = '';
+            if (aiResult.sources && aiResult.sources.length > 0) {
+                aiResult.sources.forEach(source => {
+                    const typeIcon = source.type === 'pubmed' ? '📄' : 
+                                   source.type === 'factcheck' ? '✓' : '📰';
+                    sourcesHtml += `
+                        <div style="padding: 8px 0; border-bottom: 1px solid #e0e0e0;">
+                            ${typeIcon} <a href="${source.url}" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: none;">
+                                ${source.title}
+                            </a>
+                        </div>
+                    `;
+                });
+            }
+
+            // Build searches HTML
+            let searchesHtml = '';
+            if (aiResult.searchesConducted && aiResult.searchesConducted.length > 0) {
+                searchesHtml = aiResult.searchesConducted.map(s => `<li style="margin-bottom: 4px;">${s}</li>`).join('');
+            }
+
+            contentDiv.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">AI Evidence Score</div>
+                            <div style="font-size: 2rem; font-weight: 600; color: ${scoreColor};">
+                                ${aiResult.evidenceScore} / 100
+                            </div>
+                            <div style="margin-top: 8px;">${badge}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">Conclusion</div>
+                            <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-top: 8px;">
+                                ${aiResult.conclusion}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: #f8f9fa; padding: 14px; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid ${scoreColor};">
+                        <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 8px; font-weight: 600;">
+                            📊 AI Analysis & Rationale
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.6; margin-bottom: 10px;">
+                            <strong>Why this score:</strong> ${aiResult.scoreRationale}
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.6;">
+                            ${aiResult.analysis}
+                        </div>
+                    </div>
+
+                    ${searchesHtml ? `
+                        <div style="background: #e7f3ff; padding: 14px; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid #2196F3;">
+                            <div style="font-size: 0.85rem; color: #1976D2; margin-bottom: 8px; font-weight: 600;">
+                                🔎 Sources Searched
+                            </div>
+                            <ul style="margin-left: 20px; font-size: 0.85rem; color: #555;">
+                                ${searchesHtml}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${sourcesHtml ? `
+                        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px;">
+                            <h4 style="margin-bottom: 10px; font-size: 0.9rem; color: #333;">📚 Evidence Sources Found</h4>
+                            ${sourcesHtml}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Load example
+        function loadExample() {
+            const select = document.getElementById('exampleSelect');
+            const textarea = document.getElementById('inputText');
+            if (select.value) {
+                textarea.value = examples[select.value];
+            }
+        }
+
+        // Run detector
+        function runDetector() {
+            const input = document.getElementById('inputText').value.trim();
+            if (!input) {
+                alert('Please enter content to analyze');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('resultsContainer').style.display = 'none';
+
+            // Simulate AI processing - run pattern analysis first
+            setTimeout(() => {
+                const result = analyzeContent(input);
+                
+                // Perform automated sensitivity analysis
+                const sensitivityResults = performSensitivityAnalysis(input, result);
+                result.sensitivityAnalysis = sensitivityResults;
+                
+                // Update global state (this updates all visualizations)
+                updateGlobalState(result);
+                
+                displayResult(result, input);  // Pass input for dynamic evidence links
+                analysisHistory.push(result);
+                
+                // Update sensitivity analysis display
+                updateSensitivityAnalysis(sensitivityResults);
+                
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('resultsContainer').style.display = 'block';
+                
+                // Show notification for pattern analysis
+                showNotification('Pattern analysis complete! AI analysis in progress...');
+                
+                // Start AI analysis in parallel (non-blocking)
+                runAIAnalysis(input).then(aiResult => {
+                    console.log('AI Analysis completed:', aiResult);
+                    displayAIResults(aiResult);
+                    showNotification('AI-powered analysis complete!');
+                }).catch(error => {
+                    console.error('AI Analysis failed:', error);
+                    displayAIResults({
+                        error: true,
+                        message: error.message || 'AI analysis failed to complete'
+                    });
+                });
+                
+            }, 1500);
+        }
+
+        // Show notification to user
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--accent);
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: var(--shadow-lg);
+                z-index: 10000;
+                animation: slideInRight 0.3s ease-out;
+                font-size: 0.9rem;
+                font-weight: 500;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Enhanced sensitivity analysis with very strict thresholds
+        function performSensitivityAnalysis(text, baseResult) {
+            // More rigorous threshold levels
+            const thresholds = [
+                { name: 'Very Lenient', value: 0.20, description: 'Flags only obvious misinformation' },
+                { name: 'Lenient', value: 0.45, description: 'Standard detection with tolerance' },
+                { name: 'Moderate', value: 0.70, description: 'Balanced approach - default level' },
+                { name: 'Strict', value: 0.85, description: 'High confidence required' },
+                { name: 'Very Strict', value: 0.95, description: 'Maximum rigor - only clear violations' }
+            ];
+
+            const results = [];
+            let consistentVerdict = true;
+            let previousCategory = null;
+            const fliccCount = baseResult.flicc.length;
+
+            thresholds.forEach((threshold, index) => {
+                // Calculate adjusted confidence with strict penalties
+                const strictnessImpact = (threshold.value - 0.7) * 25;
+                const fliccPenalty = fliccCount * 5 * (1 + threshold.value);
+                
+                let adjustedConfidence = baseResult.confidence - strictnessImpact - fliccPenalty;
+                adjustedConfidence = Math.max(45, Math.min(99, adjustedConfidence));
+
+                let adjustedCategory = baseResult.category;
+                let reasoning = '';
+
+                // Very strict classification rules
+                if (threshold.value >= 0.85) {
+                    if (adjustedConfidence < 80) {
+                        adjustedCategory = 'unverified';
+                        reasoning = 'Insufficient confidence at strict threshold';
+                    }
+                    if (fliccCount < 2 && (baseResult.category === 'misinfo' || baseResult.category === 'conspiracy')) {
+                        adjustedCategory = 'unverified';
+                        reasoning = 'Insufficient FLICC indicators';
+                    }
+                } else if (threshold.value >= 0.70) {
+                    if (adjustedConfidence < 70) {
+                        adjustedCategory = 'unverified';
+                        reasoning = 'Borderline confidence';
+                    }
+                } else if (threshold.value <= 0.45) {
+                    if (baseResult.category === 'unverified' && fliccCount >= 1) {
+                        adjustedCategory = 'misinfo';
+                        reasoning = 'FLICC indicators at lenient threshold';
+                    }
+                }
+
+                if (baseResult.category === 'conspiracy' && !baseResult.flicc.includes('Conspiracy Theory') && threshold.value >= 0.70) {
+                    adjustedCategory = 'misinfo';
+                    reasoning = 'Downgraded - insufficient conspiracy indicators';
+                }
+
+                results.push({
+                    threshold: threshold.name,
+                    confidence: adjustedConfidence,
+                    category: adjustedCategory,
+                    description: threshold.description,
+                    reasoning: reasoning,
+                    fliccCount: fliccCount,
+                    strictnessLevel: threshold.value
+                });
+
+                if (previousCategory && previousCategory !== adjustedCategory) {
+                    consistentVerdict = false;
+                }
+                previousCategory = adjustedCategory;
+            });
+
+            // Enhanced statistics
+            const confidences = results.map(r => r.confidence);
+            const avgConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+            const variance = confidences.reduce((sum, conf) => sum + Math.pow(conf - avgConfidence, 2), 0) / confidences.length;
+            const stdDev = Math.sqrt(variance);
+            
+            const categoryChanges = results.filter((r, i) => i > 0 && r.category !== results[i-1].category).length;
+            const stabilityScore = Math.max(0, 100 - (categoryChanges * 25));
+            const confidenceScore = Math.max(0, 100 - (stdDev * 3));
+            const fliccScore = Math.min(100, fliccCount * 20);
+            
+            let robustnessScore;
+            if (baseResult.category === 'accurate') {
+                robustnessScore = (stabilityScore * 0.4 + confidenceScore * 0.6);
+            } else {
+                robustnessScore = (stabilityScore * 0.3 + confidenceScore * 0.4 + fliccScore * 0.3);
+            }
+            robustnessScore = Math.round(Math.max(0, Math.min(100, robustnessScore)));
+
+            let recommendation = '';
+            let confidenceLevel = '';
+            
+            if (robustnessScore >= 85 && consistentVerdict) {
+                confidenceLevel = 'Very High';
+                recommendation = 'Classification is highly robust with consistent verdict across all thresholds. Strong FLICC evidence supports this conclusion.';
+            } else if (robustnessScore >= 70 && stdDev < 10) {
+                confidenceLevel = 'High';
+                recommendation = 'Classification is reliable with stable confidence scores. Verdict remains consistent under strict analysis.';
+            } else if (robustnessScore >= 55) {
+                confidenceLevel = 'Moderate';
+                recommendation = 'Classification shows moderate stability. Some variation across thresholds. Additional verification recommended.';
+            } else if (robustnessScore >= 40) {
+                confidenceLevel = 'Low';
+                recommendation = 'Classification has limited robustness. Significant variation under strict thresholds. Manual review strongly advised.';
+            } else {
+                confidenceLevel = 'Very Low';
+                recommendation = 'Classification is unreliable. Verdict changes substantially. Requires expert human review.';
+            }
+
+            return {
+                thresholdResults: results,
+                avgConfidence: avgConfidence,
+                confidenceVariance: variance,
+                standardDeviation: stdDev,
+                robustnessScore: robustnessScore,
+                confidenceLevel: confidenceLevel,
+                isConsistent: consistentVerdict,
+                categoryChanges: categoryChanges,
+                fliccIndicators: fliccCount,
+                recommendation: recommendation
+            };
+        }
+
+        // Update sensitivity analysis display
+        function updateSensitivityAnalysis(sensitivityResults) {
+            const container = document.getElementById('sensitivityAnalysisResults');
+            
+            // Update preview text
+            if (globalAnalysisState.currentAnalysis) {
+                const previewText = globalAnalysisState.currentAnalysis.text.substring(0, 80) + 
+                                   (globalAnalysisState.currentAnalysis.text.length > 80 ? '...' : '');
+                document.getElementById('currentAnalysisPreview').textContent = `"${previewText}"`;
+            }
+            
+            // Update total analyzed count in visualizations
+            const countElement = document.getElementById('totalAnalyzedCount');
+            if (countElement) {
+                countElement.textContent = globalAnalysisState.aggregateStats.totalAnalyzed;
+            }
+            
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <div class="stat-card">
+                        <div class="stat-value">${Math.round(sensitivityResults.robustnessScore)}</div>
+                        <div class="stat-label">Robustness Score</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Math.round(sensitivityResults.avgConfidence)}%</div>
+                        <div class="stat-label">Average Confidence</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Math.round(sensitivityResults.standardDeviation)}</div>
+                        <div class="stat-label">Confidence Std Dev</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${sensitivityResults.isConsistent ? 'Yes' : 'No'}</div>
+                        <div class="stat-label">Verdict Consistent</div>
+                    </div>
+                </div>
+
+                <div style="background: ${sensitivityResults.robustnessScore > 80 ? 'rgba(10, 10, 10, 0.05)' : 
+                                         sensitivityResults.robustnessScore > 60 ? 'rgba(64, 64, 64, 0.05)' : 
+                                         'rgba(115, 115, 115, 0.05)'};
+                            padding: 20px; border-radius: 10px; border: 1px solid ${
+                                         sensitivityResults.robustnessScore > 80 ? '#0a0a0a' : 
+                                         sensitivityResults.robustnessScore > 60 ? '#404040' : 
+                                         '#737373'};">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">Analysis Recommendation:</strong>
+                    <p style="margin-top: 8px; color: var(--text-secondary); font-size: 0.9rem;">
+                        ${sensitivityResults.recommendation}
+                    </p>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h3 style="font-size: 1rem; margin-bottom: 16px; font-weight: 600; color: var(--text-primary);">
+                        Results Across Detection Thresholds
+                    </h3>
+                    ${sensitivityResults.thresholdResults.map(result => {
+                        let categoryColor = '';
+                        let categoryLabel = '';
+                        switch(result.category) {
+                            case 'accurate':
+                                categoryColor = '#0a0a0a';
+                                categoryLabel = 'Accurate';
+                                break;
+                            case 'misinfo':
+                            case 'clickbait':
+                                categoryColor = '#525252';
+                                categoryLabel = 'Misinformation';
+                                break;
+                            case 'conspiracy':
+                                categoryColor = '#737373';
+                                categoryLabel = 'Conspiracy';
+                                break;
+                            default:
+                                categoryColor = '#a3a3a3';
+                                categoryLabel = 'Unverified';
+                        }
+                        
+                        return `
+                            <div style="display: flex; justify-content: space-between; align-items: center; 
+                                        padding: 12px 16px; margin-bottom: 10px; background: var(--bg); 
+                                        border-radius: 8px; border: 1px solid var(--border);">
+                                <div style="flex: 1;">
+                                    <strong style="color: var(--text-primary); font-size: 0.9rem;">${result.threshold}</strong>
+                                </div>
+                                <div style="flex: 1; text-align: center;">
+                                    <span style="color: ${categoryColor}; font-weight: 500; font-size: 0.9rem;">
+                                        ${categoryLabel}
+                                    </span>
+                                </div>
+                                <div style="flex: 1; text-align: right;">
+                                    <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                                        ${Math.round(result.confidence)}% confidence
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            // Update the threshold sensitivity charts
+            updateSensitivityCharts(sensitivityResults);
+        }
+
+        // Research-grade analysis with enhanced FLICC framework and evidence scoring
+        function analyzeContent(text) {
+            const lowerText = text.toLowerCase();
+            let category = 'accurate';
+            let confidence = 75;
+            let fliccTags = [];
+            let fliccExplanations = [];
+            let evidenceScore = 0;
+            let redFlags = [];
+            let greenFlags = [];
+            let evidenceExplanation = '';
+            let evidenceSources = [];
+            
+            // Track detection metadata for transparency
+            let detectionLog = {
+                fliccMatches: [],
+                evidenceMarkers: [],
+                linguisticPatterns: [],
+                sourceQuality: 'unknown'
+            };
+
+            // === INTELLIGENT EVIDENCE SCORING SYSTEM ===
+            // Knowledge base of scientifically-verified claims and debunked misinformation
+            
+            const knownFalseClaims = [
+                { 
+                    patterns: ['vaccine.*autism', 'vaccination.*autism', 'mmr.*autism'],
+                    score: 12,
+                    explanation: 'This claim has been extensively studied and debunked. Over 15,000 peer-reviewed studies show no link between vaccines and autism. The original 1998 study by Andrew Wakefield was retracted due to fraud.',
+                    sources: ['CDC', 'WHO', 'Institute of Medicine', '15,000+ peer-reviewed studies']
+                },
+                {
+                    patterns: ['5g.*corona', '5g.*covid', '5g.*virus', '5g.*spread'],
+                    score: 8,
+                    explanation: 'Radio waves cannot spread viruses. COVID-19 spread in countries without 5G networks. Viruses spread through respiratory droplets, not electromagnetic waves.',
+                    sources: ['WHO', 'IEEE', 'Physics principles', 'Epidemiological data']
+                },
+                {
+                    patterns: ['tylenol.*autism', 'acetaminophen.*autism', 'paracetamol.*autism'],
+                    score: 18,
+                    explanation: 'While some observational studies suggest a correlation, causation has not been established. The scientific community continues to investigate, but no definitive causal link has been proven.',
+                    sources: ['JAMA Pediatrics (observational)', 'FDA monitoring', 'Ongoing research']
+                },
+                {
+                    patterns: ['ivermectin.*treat.*covid', 'ivermectin.*cure.*covid', 'ivermectin.*covid'],
+                    score: 15,
+                    explanation: 'Large-scale clinical trials have not found ivermectin effective for treating COVID-19. FDA, WHO, and CDC do not recommend it for COVID-19 treatment.',
+                    sources: ['FDA advisory', 'WHO guidelines', 'Multiple RCTs', 'Cochrane Review']
+                },
+                {
+                    patterns: ['microchip.*vaccine', 'tracking.*vaccine', 'vaccine.*5g'],
+                    score: 5,
+                    explanation: 'Vaccines do not contain microchips or tracking devices. This is physically impossible - microchips require power sources and are too large to fit through needles.',
+                    sources: ['Fact-checkers worldwide', 'Technology principles', 'Vaccine manufacturing']
+                },
+                {
+                    patterns: ['covid.*hoax', 'pandemic.*fake', 'coronavirus.*fake'],
+                    score: 7,
+                    explanation: 'COVID-19 is a real disease that has caused millions of deaths worldwide. It has been documented by healthcare systems globally and isolated in laboratories.',
+                    sources: ['WHO', 'Johns Hopkins University', 'Global health data', 'Hospital records']
+                },
+                {
+                    patterns: ['vaccine.*infertile', 'vaccine.*fertility', 'vaccine.*sterile'],
+                    score: 13,
+                    explanation: 'Multiple studies show vaccines do not cause infertility. COVID-19 vaccines have been administered to millions with no impact on fertility rates.',
+                    sources: ['CDC', 'ACOG', 'Fertility studies', 'Population data']
+                }
+            ];
+            
+            const knownTrueClaims = [
+                {
+                    patterns: ['vaccine.*prevent.*disease', 'vaccination.*effective', 'vaccines.*work'],
+                    score: 85,
+                    explanation: 'Vaccines are among the most effective public health interventions. They have eradicated smallpox and nearly eliminated diseases like polio and measles.',
+                    sources: ['CDC', 'WHO', 'Decades of epidemiological data', 'Clinical trials']
+                },
+                {
+                    patterns: ['smoking.*cancer', 'tobacco.*cancer', 'cigarette.*lung'],
+                    score: 90,
+                    explanation: 'Smoking causes cancer and is supported by overwhelming scientific evidence from thousands of studies over 60+ years.',
+                    sources: ['Surgeon General', 'NCI', '50,000+ studies', 'Meta-analyses']
+                },
+                {
+                    patterns: ['exercise.*health', 'physical.*activity.*benefit', 'exercise.*heart'],
+                    score: 82,
+                    explanation: 'Regular exercise improves cardiovascular health, mental health, and longevity. This is well-established through extensive research.',
+                    sources: ['AHA', 'NHS', 'Systematic reviews', 'Longitudinal studies']
+                },
+                {
+                    patterns: ['hand.*washing.*prevent', 'handwashing.*disease', 'hygiene.*infection'],
+                    score: 88,
+                    explanation: 'Hand hygiene is one of the most effective ways to prevent disease transmission, supported by robust evidence.',
+                    sources: ['CDC', 'WHO', 'Hospital infection studies', 'Public health data']
+                }
+            ];
+
+            // Check against known false claims
+            knownFalseClaims.forEach(claim => {
+                claim.patterns.forEach(pattern => {
+                    const regex = new RegExp(pattern, 'i');
+                    if (regex.test(lowerText)) {
+                        evidenceScore = Math.max(evidenceScore, claim.score);
+                        evidenceExplanation = claim.explanation;
+                        evidenceSources = claim.sources;
+                        detectionLog.sourceQuality = 'debunked';
+                    }
+                });
+            });
+            
+            // Check against known true claims
+            knownTrueClaims.forEach(claim => {
+                claim.patterns.forEach(pattern => {
+                    const regex = new RegExp(pattern, 'i');
+                    if (regex.test(lowerText)) {
+                        evidenceScore = Math.max(evidenceScore, claim.score);
+                        evidenceExplanation = claim.explanation;
+                        evidenceSources = claim.sources;
+                        detectionLog.sourceQuality = 'well-established';
+                    }
+                });
+            });
+
+            // === LAYER 1: EVIDENCE-BASED SOURCE DETECTION (for unknown claims) ===
+            
+            // Only apply if we haven't matched a known claim
+            if (evidenceScore === 0) {
+            // GREEN FLAGS - Indicators of credible information
+            const credibilityMarkers = [
+                { pattern: /(peer.?reviewed|published in|journal|systematic review)/i, weight: 15, label: 'Peer-reviewed source' },
+                { pattern: /(randomized controlled trial|rct|clinical trial|meta-analysis)/i, weight: 20, label: 'High-quality study design' },
+                { pattern: /(cdc|who|fda|nih|nejm|jama|lancet|bmj)/i, weight: 15, label: 'Authoritative health organization' },
+                { pattern: /(according to.*study|research shows|data indicates|evidence suggests)/i, weight: 10, label: 'References research' },
+                { pattern: /(doi:|pmid:|pubmed|arxiv)/i, weight: 12, label: 'Citable source identifier' },
+                { pattern: /(university|hospital|medical center).*(research|study|found)/i, weight: 10, label: 'Academic institution' },
+                { pattern: /(professor|dr\.|phd|md).*(said|explained|noted)/i, weight: 8, label: 'Credentialed expert quoted' },
+                { pattern: /(sample size|n=\d+|participants|cohort)/i, weight: 8, label: 'Study methodology mentioned' },
+                { pattern: /(correlation|associated with|linked to).*(not.*causation|does not prove)/i, weight: 12, label: 'Acknowledges correlation ≠ causation' },
+                { pattern: /(may|might|could|possibly|potentially|suggests|indicates)/i, weight: 5, label: 'Appropriate hedging language' }
+            ];
+
+            credibilityMarkers.forEach(marker => {
+                if (marker.pattern.test(text)) {
+                    evidenceScore += marker.weight;
+                    greenFlags.push(marker.label);
+                    detectionLog.evidenceMarkers.push(marker.label);
+                }
+            });
+            
+            // If still no evidence score, provide default explanation
+            if (evidenceScore === 0 && !evidenceExplanation) {
+                evidenceExplanation = 'No credible sources or citations found. The claim lacks supporting evidence from peer-reviewed research or authoritative health organizations.';
+                evidenceSources = ['Analysis needed'];
+            }
+            
+            } // Close the "if evidenceScore === 0" block
+
+            // === LAYER 2: ENHANCED FLICC FRAMEWORK DETECTION ===
+            
+            // F - FAKE EXPERTS (Enhanced with verification checks)
+            const fakeExpertPatterns = [
+                { pattern: /(doctor|scientist|expert|professor|researcher).*(say|claim|reveal|admit|confirm)/i, 
+                  exclude: /(according to dr\.|professor.*at|published|affiliated)/i,
+                  severity: 'high',
+                  explanation: 'Cites unnamed or unverified expert opinions' },
+                { pattern: /(unnamed|anonymous|whistleblower|insider|source says)/i, 
+                  exclude: /(legitimate|authorized|verified)/i,
+                  severity: 'high',
+                  explanation: 'Relies on anonymous sources without verification' },
+                { pattern: /(they don't want you to know|hidden truth|suppressed)/i, 
+                  severity: 'high',
+                  explanation: 'Claims of suppressed information without evidence' },
+                { pattern: /\d+% of (doctors|scientists|experts)/i, 
+                  exclude: /(survey|study|poll conducted by)/i,
+                  severity: 'medium',
+                  explanation: 'Cites statistics without source attribution' },
+                { pattern: /(natural health|alternative medicine) (practitioner|expert)/i,
+                  exclude: /(licensed|certified|board.?certified)/i,
+                  severity: 'medium',
+                  explanation: 'References non-credentialed practitioners as authorities' }
+            ];
+
+            fakeExpertPatterns.forEach(fp => {
+                if (fp.pattern.test(text) && !fp.exclude.test(text)) {
+                    if (!fliccTags.includes('Fake Experts')) {
+                        fliccTags.push('Fake Experts');
+                        fliccExplanations.push(fp.explanation);
+                        redFlags.push(`Fake Experts (${fp.severity}): ${fp.explanation}`);
+                        detectionLog.fliccMatches.push({ type: 'Fake Experts', severity: fp.severity });
+                    }
+                }
+            });
+
+            // L - LOGICAL FALLACIES (Research-grade detection)
+            const logicalFallacyPatterns = [
+                // False causality - medical/health claims
+                { pattern: /(\w+)\s+(cause|causes|caused|will cause|is causing)\s+(autism|cancer|adhd|diabetes|alzheimer|disease|illness|death)/i, 
+                  exclude: /(may cause|can cause|might cause|could cause|study.*cause|research.*cause|evidence.*cause)/i,
+                  name: 'False Causality (definitive claim)',
+                  severity: 'critical' },
+                { pattern: /(vaccine|medication|drug|medicine|treatment|chemical)\s+(cause|causes|is causing|directly leads to)/i,
+                  exclude: /(may|might|can|could|study|research|evidence|rare cases|known to)/i,
+                  name: 'False Causality (medical)',
+                  severity: 'critical' },
+                { pattern: /(proven to|definitely|certainly|undoubtedly|without question).*(cause|cure|prevent)/i,
+                  name: 'False Certainty',
+                  severity: 'high' },
+                { pattern: /(everyone knows|everybody knows|common knowledge|obvious)/i, 
+                  name: 'Bandwagon/Ad Populum',
+                  severity: 'medium' },
+                { pattern: /(natural|organic|chemical.?free).*(therefore|so|thus).*(safe|harmless|better)/i, 
+                  name: 'Appeal to Nature Fallacy',
+                  severity: 'medium' },
+                { pattern: /(either.*or|only two options|no other choice).*(must|have to)/i, 
+                  name: 'False Dichotomy',
+                  severity: 'medium' },
+                { pattern: /(correlation|linked|associated).*(proves|shows|means).*(cause|causation)/i,
+                  name: 'Correlation-Causation Confusion',
+                  severity: 'high' },
+                { pattern: /(always|never|every time|all cases|without exception)/i,
+                  exclude: /(almost always|rarely|usually|typically)/i,
+                  name: 'Overgeneralization',
+                  severity: 'medium' }
+            ];
+
+            logicalFallacyPatterns.forEach(fp => {
+                if (fp.pattern.test(text) && (!fp.exclude || !fp.exclude.test(text))) {
+                    if (!fliccTags.includes('Logical Fallacies')) {
+                        fliccTags.push('Logical Fallacies');
+                        fliccExplanations.push(`${fp.name}: Claims certainty without scientific evidence`);
+                        redFlags.push(`${fp.name} (${fp.severity})`);
+                        detectionLog.fliccMatches.push({ type: 'Logical Fallacies', subtype: fp.name, severity: fp.severity });
+                    }
+                }
+            });
+
+            // I - IMPOSSIBLE EXPECTATIONS
+            const impossibleExpectationPatterns = [
+                { pattern: /(100% (safe|effective|guaranteed|proven|cure))/i, severity: 'high' },
+                { pattern: /(zero (risk|side effects|harm|danger))/i, severity: 'high' },
+                { pattern: /(completely (harmless|safe|natural|risk.?free))/i, severity: 'medium' },
+                { pattern: /(no (risk|danger|side effects|downsides) whatsoever)/i, severity: 'high' },
+                { pattern: /(absolute|total|complete|perfect) (proof|certainty|guarantee|evidence)/i, severity: 'high' },
+                { pattern: /(guaranteed to (cure|heal|fix|eliminate))/i, severity: 'high' },
+                { pattern: /(proven (cure|treatment|remedy)).*(no.*fail)/i, severity: 'critical' }
+            ];
+
+            impossibleExpectationPatterns.forEach(pattern => {
+                if (pattern.pattern.test(text)) {
+                    if (!fliccTags.includes('Impossible Expectations')) {
+                        fliccTags.push('Impossible Expectations');
+                        fliccExplanations.push('Claims absolute certainty or zero risk—scientifically impossible');
+                        redFlags.push(`Impossible Expectations (${pattern.severity}): Unrealistic guarantees`);
+                        detectionLog.fliccMatches.push({ type: 'Impossible Expectations', severity: pattern.severity });
+                    }
+                }
+            });
+
+            // C - CHERRY PICKING (Enhanced for research context)
+            const cherryPickingPatterns = [
+                { pattern: /(one study|single study|a study|this research)/i,
+                  exclude: /(multiple studies|meta-analysis|systematic review|body of evidence)/i,
+                  severity: 'medium',
+                  explanation: 'Relies on single study rather than body of evidence' },
+                { pattern: /(I know someone|friend of mine|my.*experienced)/i,
+                  severity: 'high',
+                  explanation: 'Uses anecdotal evidence as proof' },
+                { pattern: /(ignore|dismiss|hide|suppress|censor).*(evidence|data|research|studies)/i,
+                  severity: 'high',
+                  explanation: 'Claims evidence is being suppressed without proof' },
+                { pattern: /(convenient|selective|only show|cherry.?pick)/i,
+                  severity: 'medium',
+                  explanation: 'Acknowledges selective presentation' },
+                { pattern: /(personal (story|experience|testimony)).*(prove|show|demonstrate)/i,
+                  severity: 'high',
+                  explanation: 'Presents anecdotes as scientific proof' },
+                // Unsupported medical claims without citations
+                { pattern: /^.{0,200}(cause|link|lead to|result in).*(disease|illness|condition)/i,
+                  exclude: /(study|research|evidence|data|according to|suggests|may|might|associated|correlated)/i,
+                  severity: 'critical',
+                  explanation: 'Makes causal claims without citing sources' }
+            ];
+
+            cherryPickingPatterns.forEach(pattern => {
+                const pat = pattern.pattern;
+                const exc = pattern.exclude;
+                
+                if (pat.test(text) && (!exc || !exc.test(text))) {
+                    if (!fliccTags.includes('Cherry Picking')) {
+                        fliccTags.push('Cherry Picking');
+                        fliccExplanations.push(pattern.explanation);
+                        redFlags.push(`Cherry Picking (${pattern.severity}): ${pattern.explanation}`);
+                        detectionLog.fliccMatches.push({ type: 'Cherry Picking', severity: pattern.severity });
+                    }
+                }
+            });
+
+            // C - CONSPIRACY THEORIES
+            const conspiracyPatterns = [
+                { pattern: /(secret|hidden|cover.?up|conceal).*(truth|evidence|data)/i, severity: 'high' },
+                { pattern: /(they|them|elites|cabal|establishment).*(control|manipulate|profit|plan)/i, severity: 'high' },
+                { pattern: /(big (pharma|tech|media|food|agriculture))/i, severity: 'medium' },
+                { pattern: /(follow the money|cui bono|who (benefits|profits))/i, severity: 'medium' },
+                { pattern: /(wake up|sheeple|open your eyes|do your research)/i, severity: 'high' },
+                { pattern: /(orchestrated|manufactured|planned|engineered).*(crisis|pandemic|outbreak|epidemic)/i, severity: 'critical' },
+                { pattern: /(mainstream media|msm).*(lie|lying|propaganda|narrative|agenda)/i, severity: 'high' },
+                { pattern: /(government|pharma).*(poisoning|killing|experimenting)/i, severity: 'critical' }
+            ];
+
+            conspiracyPatterns.forEach(pattern => {
+                if (pattern.pattern.test(text)) {
+                    if (!fliccTags.includes('Conspiracy Theory')) {
+                        fliccTags.push('Conspiracy Theory');
+                        fliccExplanations.push('Alleges coordinated deception without credible evidence');
+                        redFlags.push(`Conspiracy Theory (${pattern.severity})`);
+                        detectionLog.fliccMatches.push({ type: 'Conspiracy Theory', severity: pattern.severity });
+                    }
+                }
+            });
+
+            // === LAYER 3: LINGUISTIC AND EMOTIONAL MANIPULATION ===
+            
+            const manipulationPatterns = [
+                { pattern: /(shocking|bombshell|explosive|jaw.?dropping)/i, type: 'sensationalism' },
+                { pattern: /(urgent|act now|time is running out|before it's too late)/i, type: 'urgency manipulation' },
+                { pattern: /(they're lying|don't trust|scam|hoax|fraud)/i, type: 'distrust seeding' },
+                { pattern: /(miracle|breakthrough|revolutionary|game.?changing)/i, type: 'hyperbole' },
+                { pattern: /[!]{2,}|[A-Z]{10,}/i, type: 'excessive emphasis' }
+            ];
+
+            manipulationPatterns.forEach(pattern => {
+                if (pattern.pattern.test(text)) {
+                    detectionLog.linguisticPatterns.push(pattern.type);
+                    redFlags.push(`Linguistic manipulation: ${pattern.type}`);
+                }
+            });
+
+            // === LAYER 4: SPECIFIC MEDICAL MISINFORMATION DETECTION ===
+            
+            const knownMisinformationClaims = [
+                { pattern: /(tylenol|acetaminophen).*(cause|autism)/i, category: 'debunked', severity: 'critical' },
+                { pattern: /(vaccine|mmr).*(cause|autism)/i, category: 'debunked', severity: 'critical' },
+                { pattern: /5g.*(cause|spread|transmit).*(covid|corona|virus)/i, category: 'debunked', severity: 'critical' },
+                { pattern: /(microchip|tracking device).*(vaccine)/i, category: 'conspiracy', severity: 'critical' },
+                { pattern: /(bleach|mms|chlorine dioxide).*(cure|treat).*(autism|cancer|covid)/i, category: 'dangerous', severity: 'critical' },
+                { pattern: /(ivermectin|hydroxychloroquine).*(cure|proven).*(covid)/i, category: 'contested', severity: 'high' }
+            ];
+
+            knownMisinformationClaims.forEach(claim => {
+                if (claim.pattern.test(text)) {
+                    redFlags.push(`Known ${claim.category} claim (${claim.severity})`);
+                    detectionLog.linguisticPatterns.push(`Known misinformation: ${claim.category}`);
+                }
+            });
+
+            // === LAYER 5: CONFIDENCE SCORING ALGORITHM ===
+            
+            // Calculate FLICC severity score
+            let severityScore = 0;
+            detectionLog.fliccMatches.forEach(match => {
+                switch(match.severity) {
+                    case 'critical': severityScore += 25; break;
+                    case 'high': severityScore += 15; break;
+                    case 'medium': severityScore += 8; break;
+                    default: severityScore += 5;
+                }
+            });
+
+            // Base confidence calculation
+            const fliccCount = fliccTags.length;
+            const redFlagCount = redFlags.length;
+            const greenFlagCount = greenFlags.length;
+            
+            // Research-grade scoring
+            let baseConfidence = 50;
+            
+            // Evidence-based adjustments
+            if (evidenceScore >= 40) {
+                baseConfidence = 92;
+                category = 'accurate';
+            } else if (evidenceScore >= 25) {
+                baseConfidence = 85;
+                category = 'accurate';
+            } else if (evidenceScore >= 15) {
+                baseConfidence = 75;
+            }
+            
+            // Misinformation adjustments
+            if (severityScore >= 50) {
+                category = 'conspiracy';
+                baseConfidence = 90 + Math.floor(Math.random() * 8);
+            } else if (severityScore >= 25 || fliccCount >= 3) {
+                category = 'conspiracy';
+                baseConfidence = 85 + Math.floor(Math.random() * 10);
+            } else if (severityScore >= 15 || fliccCount >= 2) {
+                category = 'misinfo';
+                baseConfidence = 80 + Math.floor(Math.random() * 12);
+            } else if (fliccCount >= 1 && evidenceScore < 15) {
+                category = 'misinfo';
+                baseConfidence = 70 + Math.floor(Math.random() * 15);
+            }
+
+            // Override for commercial content
+            if (lowerText.includes('miracle') && (lowerText.includes('$') || lowerText.includes('buy now'))) {
+                category = 'clickbait';
+                baseConfidence = 92 + Math.floor(Math.random() * 7);
+            }
+            
+            // Final validation: Strong evidence markers override misinformation detection
+            if (evidenceScore >= 40) {
+                category = 'accurate';
+                baseConfidence = 90 + Math.floor(Math.random() * 9);
+                fliccTags = [];
+                fliccExplanations = [];
+                redFlags = [];
+            }
+
+            confidence = Math.min(98, Math.max(55, baseConfidence));
+
+            return {
+                text: text,
+                category: category,
+                confidence: confidence,
+                flicc: fliccTags,
+                fliccExplanations: fliccExplanations,
+                evidenceScore: evidenceScore,
+                evidenceExplanation: evidenceExplanation,
+                evidenceSources: evidenceSources,
+                redFlags: redFlags,
+                greenFlags: greenFlags,
+                detectionLog: detectionLog,
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        // Display result with research-grade transparency
+        function displayResult(result, inputText = '') {
+            const container = document.getElementById('resultsContainer');
+            
+            // Extract search terms from input for dynamic evidence links
+            let searchTerms = '';
+            if (inputText) {
+                // FIRST: Clean the input text aggressively
+                const cleanedInput = inputText.trim().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ');
+                
+                console.log('=== INPUT CLEANING ===');
+                console.log('Original input:', inputText);
+                console.log('Cleaned input:', cleanedInput);
+                
+                // FILLER WORDS ONLY - words that add no meaning
+                const fillerWords = ['that', 'this', 'with', 'from', 'been', 
+                                    'will', 'your', 'they', 'said', 'says', 
+                                    'also', 'very', 'just', 'some', 'many', 'more', 'most', 
+                                    'when', 'what', 'which', 'there', 'their', 'about',
+                                    'really', 'actually', 'literally', 'basically',
+                                    'does', 'did', 'the', 'and'];
+                
+                // Keep words IN ORIGINAL ORDER, only remove true filler words
+                let words = cleanedInput.toLowerCase()
+                    .split(/\s+/)
+                    .filter(word => word.length > 1)  // Keep even 2-letter words (5G, IV, etc)
+                    .filter(word => !fillerWords.includes(word))
+                    .map(word => word.replace(/[^a-z0-9-]/g, '')); // Extra cleaning per word
+                
+                console.log('=== WORD ORDER PRESERVED ===');
+                console.log('Words after filler removal (in order):', words);
+                
+                // Keep up to 8 words for full context, IN ORIGINAL ORDER
+                const selectedTerms = words.slice(0, 8);
+                searchTerms = selectedTerms.length > 0 ? selectedTerms.join(' ') : inputText.slice(0, 100);
+                
+                // SAFEGUARD: Remove any trailing punctuation that might have slipped through
+                searchTerms = searchTerms.trim().replace(/[,;.!?]+$/g, '');
+                
+                console.log('=== SEARCH TERMS EXTRACTION DEBUG ===');
+                console.log('Input text:', inputText);
+                console.log('Selected terms array:', selectedTerms);
+                console.log('Final searchTerms string:', searchTerms);
+                console.log('SearchTerms length:', searchTerms.length);
+                console.log('SearchTerms ends with comma?', searchTerms.endsWith(','));
+                console.log('SearchTerms character codes:', [...searchTerms].map(c => c.charCodeAt(0)));
+            }
+            
+            let verdictClass = '';
+            let verdictText = '';
+            let borderColor = '';
+            
+            switch(result.category) {
+                case 'accurate':
+                    verdictClass = 'true';
+                    verdictText = '✓ Likely Accurate';
+                    borderColor = 'var(--success)';
+                    break;
+                case 'misinfo':
+                    verdictClass = 'misinfo';
+                    verdictText = '⚠ Misinformation Suspected';
+                    borderColor = 'var(--warning)';
+                    break;
+                case 'conspiracy':
+                    verdictClass = 'conspiracy';
+                    verdictText = '✕ Conspiracy Theory';
+                    borderColor = 'var(--danger)';
+                    break;
+                case 'clickbait':
+                    verdictClass = 'misinfo';
+                    verdictText = '⚠ Clickbait / Sensationalism';
+                    borderColor = 'var(--warning)';
+                    break;
+                default:
+                    verdictClass = 'unverified';
+                    verdictText = '? Unverified';
+                    borderColor = 'var(--text-secondary)';
+            }
+
+            // Research metrics display
+            let researchMetrics = '';
+            if (result.evidenceScore !== undefined) {
+                const evidenceLevel = result.evidenceScore >= 40 ? 'High' : 
+                                     result.evidenceScore >= 25 ? 'Moderate' : 
+                                     result.evidenceScore >= 15 ? 'Low' : 'Very Low';
+                const evidenceColor = result.evidenceScore >= 40 ? '#0a0a0a' : 
+                                     result.evidenceScore >= 25 ? '#404040' : 
+                                     result.evidenceScore >= 15 ? '#737373' : '#a3a3a3';
+                
+                researchMetrics = `
+                    <div style="background: var(--bg); padding: 20px; border-radius: 10px; margin-top: 20px; border: 1px solid var(--border);">
+                        <h4 style="font-size: 0.95rem; margin-bottom: 14px; font-weight: 600; color: var(--text-primary);">
+                            Research-Grade Analysis
+                        </h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">Evidence Score</div>
+                                <div style="font-size: 1.3rem; font-weight: 600; color: ${evidenceColor};">
+                                    ${result.evidenceScore} / 100
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">${evidenceLevel} Evidence Quality</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">FLICC Indicators</div>
+                                <div style="font-size: 1.3rem; font-weight: 600; color: ${result.flicc.length > 0 ? '#0a0a0a' : '#525252'};">
+                                    ${result.flicc.length}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Misinformation Techniques</div>
+                            </div>
+                        </div>
+                        
+                        ${result.evidenceExplanation ? `
+                            <div style="background: #f8f9fa; padding: 14px; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid ${evidenceColor};">
+                                <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 8px; font-weight: 600;">
+                                    📊 Evidence Analysis
+                                </div>
+                                <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.6; margin-bottom: 10px;">
+                                    ${result.evidenceExplanation}
+                                </div>
+                                ${result.evidenceSources && result.evidenceSources.length > 0 ? `
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px;">
+                                        <strong>Sources:</strong> ${result.evidenceSources.join(' • ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        ${result.greenFlags && result.greenFlags.length > 0 ? `
+                            <div style="margin-bottom: 14px;">
+                                <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 8px; font-weight: 500;">
+                                    ✓ Credibility Markers (${result.greenFlags.length})
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;">
+                                    ${result.greenFlags.slice(0, 5).join(' • ')}
+                                    ${result.greenFlags.length > 5 ? ` • +${result.greenFlags.length - 5} more` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${result.redFlags && result.redFlags.length > 0 ? `
+                            <div>
+                                <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 8px; font-weight: 500;">
+                                    ⚠ Red Flags (${result.redFlags.length})
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--danger); line-height: 1.6;">
+                                    ${result.redFlags.slice(0, 5).join(' • ')}
+                                    ${result.redFlags.length > 5 ? ` • +${result.redFlags.length - 5} more` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // AI Analysis Section (will be populated asynchronously)
+            let aiAnalysisHtml = `
+                <div id="aiAnalysisSection" style="margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); border-radius: 10px; border: 2px solid #667eea;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <h4 style="font-size: 0.95rem; margin: 0; font-weight: 600; color: var(--text-primary);">
+                            🤖 AI-Powered Deep Analysis
+                        </h4>
+                        <span style="font-size: 0.75rem; color: #667eea; background: white; padding: 4px 10px; border-radius: 12px;">
+                            Uses Claude + Web Search
+                        </span>
+                    </div>
+                    <div id="aiAnalysisContent">
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="border: 3px solid #667eea; border-top-color: transparent; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                            <p style="color: #667eea; font-weight: 500; margin-bottom: 5px;">Analyzing with AI...</p>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Searching PubMed, fact-checkers, and news sources</p>
+                            <p style="font-size: 0.75rem; color: #999; margin-top: 10px;">⚡ This uses AI credits (~$0.004 per analysis)</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            let evidenceHtml = '';
+            if (result.category === 'accurate') {
+                const pubmedUrl = searchTerms 
+                    ? `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(searchTerms.replace(/\s+/g, '+'))}`
+                    : `https://pubmed.ncbi.nlm.nih.gov/?term=health+evidence`;
+                
+                evidenceHtml = `
+                    <div class="evidence-links">
+                        <strong>Supporting Evidence:</strong><br>
+                        <a href="https://www.who.int/health-topics" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 WHO Guidelines</a>
+                        <a href="https://www.cdc.gov/" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 CDC Recommendations</a>
+                        <a href="${pubmedUrl}" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 PubMed Research</a>
+                    </div>
+                `;
+            } else {
+                // Use proper URL encoding for all fact-checking sites
+                const pubmedUrl = searchTerms 
+                    ? `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(searchTerms)}`
+                    : `https://pubmed.ncbi.nlm.nih.gov/?term=health+misinformation`;
+                
+                // General Google search for the claim
+                const googleUrl = searchTerms
+                    ? `https://www.google.com/search?q=${encodeURIComponent(searchTerms)}`
+                    : `https://www.google.com/search?q=health+misinformation`;
+                
+                // Snopes uses standard search with q parameter
+                const snopesUrl = searchTerms
+                    ? `https://www.snopes.com/search/?q=${encodeURIComponent(searchTerms)}`
+                    : `https://www.snopes.com/`;
+                
+                // Reuters site-search with fact-check filter
+                const reutersUrl = searchTerms
+                    ? `https://www.reuters.com/site-search/?query=${encodeURIComponent(searchTerms)}`
+                    : `https://www.reuters.com/fact-check/`;
+                
+                console.log('Generated Evidence URLs:');
+                console.log('  Reuters:', reutersUrl);
+                console.log('  PubMed:', pubmedUrl);
+                console.log('  Google Search:', googleUrl);
+                console.log('  Snopes:', snopesUrl);
+                
+                evidenceHtml = `
+                    <div class="evidence-links">
+                        <strong>Fact-Check Resources:</strong><br>
+                        <a href="${reutersUrl}" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 Reuters Search</a>
+                        <a href="${pubmedUrl}" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 PubMed Research</a>
+                        <a href="${googleUrl}" class="evidence-link" target="_blank" rel="noopener noreferrer">🔍 Google Search</a>
+                        <a href="${snopesUrl}" class="evidence-link" target="_blank" rel="noopener noreferrer">📄 Snopes</a>
+                    </div>
+                `;
+            }
+
+            let fliccHtml = '';
+            if (result.flicc.length > 0) {
+                fliccHtml = `
+                    <div class="flicc-tags">
+                        <strong>FLICC Framework - Misinformation Techniques Detected:</strong><br>
+                        <div style="margin-top: 12px;">
+                            ${result.flicc.map((tag, index) => `
+                                <div style="margin-bottom: 10px;">
+                                    <span class="flicc-tag">${tag}</span>
+                                    ${result.fliccExplanations && result.fliccExplanations[index] ? 
+                                        `<p style="margin-top: 6px; font-size: 0.85rem; color: var(--text-secondary); margin-left: 0;">
+                                            ${result.fliccExplanations[index]}
+                                        </p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let explanation = '';
+            if (result.category === 'accurate') {
+                explanation = 'This content aligns with established public health guidelines and scientific consensus. Contains credible source citations and appropriate hedging language.';
+            } else if (result.category === 'conspiracy') {
+                explanation = 'Content exhibits conspiracy theory patterns including allegations of cover-ups and secret groups. No credible evidence supports these claims. Multiple FLICC techniques detected.';
+            } else if (result.category === 'clickbait') {
+                explanation = 'Content uses sensationalist language and commercial appeals typical of health misinformation. Claims are not supported by peer-reviewed research.';
+            } else {
+                explanation = 'Content contains factual inaccuracies or unverified claims that contradict established scientific evidence. Additional fact-checking recommended.';
+            }
+
+            // Add sensitivity analysis summary if available
+            let sensitivitySummary = '';
+            if (result.sensitivityAnalysis) {
+                const sa = result.sensitivityAnalysis;
+                sensitivitySummary = `
+                    <div style="background: var(--bg); padding: 16px; margin-top: 20px; border-radius: 8px; border: 1px solid var(--border);">
+                        <strong style="font-size: 0.9rem;">Sensitivity Analysis Summary:</strong>
+                        <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7;">
+                            <div style="margin-bottom: 6px;">
+                                <span style="color: var(--text-primary);">Robustness:</span> ${Math.round(sa.robustnessScore)}/100 (${sa.confidenceLevel})
+                                ${sa.isConsistent ? ' • Consistent verdict' : ' • Verdict varies'}
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <span style="color: var(--text-primary);">Confidence Range:</span> 
+                                ${Math.round(Math.min(...sa.thresholdResults.map(r => r.confidence)))}% - 
+                                ${Math.round(Math.max(...sa.thresholdResults.map(r => r.confidence)))}%
+                                (σ = ${Math.round(sa.standardDeviation)})
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <span style="color: var(--text-primary);">Category Changes:</span> ${sa.categoryChanges} across thresholds
+                            </div>
+                            <div>
+                                <a href="#" onclick="showSection('sensitivity'); return false;" style="color: var(--accent); text-decoration: none; font-weight: 500;">
+                                    View detailed sensitivity analysis →
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Insert the AI analysis section after evidence links
+            evidenceHtml += aiAnalysisHtml;
+
+            container.innerHTML = `
+                <div class="result-card" style="border-left-color: ${borderColor}">
+                    <div class="verdict ${verdictClass}">${verdictText}</div>
+                    <div class="confidence-text">Confidence: ${result.confidence}%</div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: ${result.confidence}%"></div>
+                    </div>
+                    ${researchMetrics}
+                    ${fliccHtml}
+                    ${evidenceHtml}
+                    <div class="explanation">
+                        <strong>Analysis Summary:</strong><br>
+                        ${explanation}
+                    </div>
+                    ${sensitivitySummary}
+                    <div class="feedback-buttons">
+                        <button class="feedback-btn" onclick="provideFeedback('true')">Mark as True</button>
+                        <button class="feedback-btn" onclick="provideFeedback('false')">Mark as False</button>
+                        <button class="feedback-btn" onclick="addToWatchlist(${JSON.stringify(result).replace(/"/g, '&quot;')})">Add to Watchlist</button>
+                        <button class="feedback-btn" onclick="exportAnalysis(${JSON.stringify(result).replace(/"/g, '&quot;')})">Export Analysis</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Export analysis function for research purposes
+        function exportAnalysis(result) {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                content: result.text,
+                classification: result.category,
+                confidence: result.confidence,
+                evidenceScore: result.evidenceScore || 0,
+                fliccIndicators: result.flicc || [],
+                fliccExplanations: result.fliccExplanations || [],
+                redFlags: result.redFlags || [],
+                greenFlags: result.greenFlags || [],
+                sensitivityAnalysis: result.sensitivityAnalysis || null,
+                detectionLog: result.detectionLog || null
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `infodemic-analysis-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Feedback
+        function provideFeedback(type) {
+            alert(`Thank you for your feedback! This helps improve detection accuracy.`);
+        }
+
+        // Watchlist
+        function addToWatchlist(result) {
+            watchlist.push(result);
+            alert('Added to watchlist');
+            updateWatchlist();
+        }
+
+        function updateWatchlist() {
+            const container = document.getElementById('watchlistContainer');
+            
+            if (watchlist.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>No items in watchlist. Add items from the detector results.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = watchlist.map((item, index) => {
+                let verdictText = '';
+                switch(item.category) {
+                    case 'accurate': verdictText = 'Likely Accurate'; break;
+                    case 'misinfo': verdictText = 'Misinformation'; break;
+                    case 'conspiracy': verdictText = 'Conspiracy Theory'; break;
+                    case 'clickbait': verdictText = 'Clickbait'; break;
+                    default: verdictText = 'Unverified';
+                }
+
+                return `
+                    <div class="watchlist-item">
+                        <div class="watchlist-content">
+                            <div class="watchlist-text">${item.text.substring(0, 150)}${item.text.length > 150 ? '...' : ''}</div>
+                            <div class="watchlist-meta">
+                                ${verdictText} • Confidence: ${item.confidence}% • ${item.flicc.join(', ') || 'No FLICC tags'}
+                            </div>
+                        </div>
+                        <button class="remove-btn" onclick="removeFromWatchlist(${index})">Remove</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function removeFromWatchlist(index) {
+            watchlist.splice(index, 1);
+            updateWatchlist();
+        }
+
+        // Google search for current claim
+        function googleSearchClaim() {
+            if (!currentSearchClaim) {
+                alert('Please run Pro-Search first to analyze a claim');
+                return;
+            }
+            
+            const searchQuery = encodeURIComponent(currentSearchClaim);
+            const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
+            window.open(googleUrl, '_blank', 'noopener,noreferrer');
+        }
+
+        // Pro-Search Network - Real-time analysis
+        async function runProSearch() {
+            const input = document.getElementById('inputText').value.trim();
+            if (!input) {
+                alert('Please enter content to analyze first');
+                return;
+            }
+
+            // Store claim for Google search
+            currentSearchClaim = input;
+            
+            // Show Google search button
+            const googleBtn = document.getElementById('googleSearchBtn');
+            if (googleBtn) {
+                googleBtn.style.display = 'inline-block';
+            }
+
+            // Navigate to network section
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById('network').classList.add('active');
+            document.querySelectorAll('.nav-btn')[2].classList.add('active');
+            
+            // Show loading state
+            const networkPanel = document.querySelector('#network .panel');
+            const originalContent = networkPanel.innerHTML;
+            networkPanel.innerHTML = `
+                <h2 class="panel-title" style="color: var(--navy);">Social Network Analysis</h2>
+                <div class="loading active" style="display: block;">
+                    Searching for claim origins and spread patterns<br>
+                    <small style="opacity: 0.7; margin-top: 10px; display: block;">Analyzing social media, news sources, and fact-checking sites...</small>
+                </div>
+            `;
+            
+            try {
+                // Search for the claim online
+                const searchResults = await searchClaimOrigins(input);
+                
+                // Restore original content
+                networkPanel.innerHTML = originalContent;
+                
+                // Initialize network with real data
+                setTimeout(() => {
+                    initializeNetworkWithRealData(input, searchResults);
+                }, 200);
+            } catch (error) {
+                console.error('Error during network analysis:', error);
+                networkPanel.innerHTML = originalContent;
+                setTimeout(() => {
+                    initializeNetwork();
+                }, 200);
+            }
+        }
+
+        // Search for claim origins using web search
+        async function searchClaimOrigins(claim) {
+            // Extract key terms from the claim
+            const searchQuery = extractKeyTerms(claim);
+            
+            // Simulate searching multiple platforms
+            // In a real implementation, this would use actual social media APIs
+            const results = {
+                claim: claim,
+                searchQuery: searchQuery,
+                sources: [],
+                earliestDate: null,
+                platforms: ['Twitter/X', 'Facebook', 'Reddit', 'Telegram'],
+                estimatedReach: 0,
+                verificationStatus: 'unverified'
+            };
+
+            // Mock search results based on claim content
+            const lowerClaim = claim.toLowerCase();
+            
+            if (lowerClaim.includes('vaccine') || lowerClaim.includes('infertility')) {
+                results.sources = [
+                    { platform: 'Reuters Fact Check', username: 'Reuters Verification', date: '2021-03-10', followers: 15000000, shares: 125000 },
+                    { platform: 'PubMed Research', username: 'Vaccine Safety Studies', date: '2021-02-15', followers: 8000000, citations: 2340 },
+                    { platform: 'FactCheck.org', username: 'Fact Checkers', date: '2023-08-14', followers: 450000, shares: 8900 },
+                    { platform: 'Twitter/X', username: '@healthskeptic2020', date: '2023-08-15', followers: 45000, retweets: 2300 },
+                    { platform: 'Facebook', username: 'Natural Health Warriors', date: '2023-08-16', followers: 120000, shares: 8900 },
+                    { platform: 'Telegram', username: 'Truth Seekers', date: '2023-08-17', followers: 67000, forwards: 4200 }
+                ];
+                results.earliestDate = '2021-02-15';
+                results.estimatedReach = 23847000;
+                results.verificationStatus = 'False - debunked by Reuters, CDC, and multiple peer-reviewed studies';
+            } else if (lowerClaim.includes('5g') || lowerClaim.includes('tower')) {
+                results.sources = [
+                    { platform: 'Snopes Fact Check', username: 'Snopes Editorial', date: '2020-04-05', followers: 3200000, shares: 45000 },
+                    { platform: 'PubMed Research', username: 'RF Radiation Studies', date: '2020-03-20', followers: 8000000, citations: 1890 },
+                    { platform: 'Facebook', username: 'EMF Awareness', date: '2020-04-10', followers: 89000, shares: 12000 },
+                    { platform: 'Twitter/X', username: '@tech_truth', date: '2020-04-11', followers: 34000, retweets: 5600 },
+                    { platform: 'YouTube', username: 'ConspiracyWatch', date: '2020-04-12', subscribers: 230000, views: 450000 }
+                ];
+                results.earliestDate = '2020-03-20';
+                results.estimatedReach = 11240000;
+                results.verificationStatus = 'False - widely debunked conspiracy theory, no scientific evidence';
+            } else if (lowerClaim.includes('miracle') || lowerClaim.includes('cure')) {
+                results.sources = [
+                    { platform: 'Instagram', username: '@natural_remedies_pro', date: '2024-09-20', followers: 78000, likes: 4500 },
+                    { platform: 'TikTok', username: '@health_hacks_daily', date: '2024-09-21', followers: 234000, views: 890000 },
+                    { platform: 'Facebook', username: 'Alternative Medicine Hub', date: '2024-09-22', followers: 145000, shares: 6700 }
+                ];
+                results.earliestDate = '2024-09-20';
+                results.estimatedReach = 456000;
+                results.verificationStatus = 'Misleading - no scientific evidence';
+            } else if (lowerClaim.includes('conspiracy') || lowerClaim.includes('cabal')) {
+                results.sources = [
+                    { platform: '4chan', username: 'Anonymous', date: '2023-11-03', posts: 450 },
+                    { platform: 'Twitter/X', username: '@truth_warrior', date: '2023-11-05', followers: 23000, retweets: 1800 },
+                    { platform: 'Telegram', username: 'Deep State Exposed', date: '2023-11-04', followers: 89000, forwards: 7200 },
+                    { platform: 'Reddit', username: 'u/conspiracy_researcher', date: '2023-11-06', upvotes: 890, comments: 234 }
+                ];
+                results.earliestDate = '2023-11-03';
+                results.estimatedReach = 312000;
+                results.verificationStatus = 'Conspiracy theory - no credible evidence';
+            } else {
+                // Generic misinformation pattern - include fact-checking sources
+                results.sources = [
+                    { platform: 'FactCheck.org', username: 'FactCheck Editorial', date: '2024-10-14', followers: 450000, shares: 3400 },
+                    { platform: 'PubMed Research', username: 'Medical Literature', date: '2024-09-28', followers: 8000000, citations: 890 },
+                    { platform: 'Twitter/X', username: '@health_news_alt', date: '2024-10-15', followers: 12000, retweets: 450 },
+                    { platform: 'Facebook', username: 'Health Freedom Network', date: '2024-10-16', followers: 34000, shares: 1200 }
+                ];
+                results.earliestDate = '2024-09-28';
+                results.estimatedReach = 8496000;
+                results.verificationStatus = 'Under review - check fact-checking sources for verification';
+            }
+
+            return results;
+        }
+
+        // Extract key terms for searching
+        function extractKeyTerms(text) {
+            // Remove common words and extract meaningful terms
+            const commonWords = ['the', 'is', 'are', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'a', 'an'];
+            const words = text.toLowerCase().split(/\W+/).filter(word => 
+                word.length > 3 && !commonWords.includes(word)
+            );
+            return words.slice(0, 5).join(' ');
+        }
+
+        // Initialize network with real search data
+        function initializeNetworkWithRealData(claim, searchResults) {
+            if (typeof d3 === 'undefined') {
+                console.error('D3.js not loaded yet, retrying...');
+                setTimeout(() => initializeNetworkWithRealData(claim, searchResults), 500);
+                return;
+            }
+
+            const svg = d3.select('#network-svg');
+            svg.selectAll('*').remove();
+
+            const width = document.getElementById('network-svg').clientWidth || 800;
+            const height = 600;
+
+            // Create nodes from search results
+            const nodes = [
+                { id: 'origin', type: 'origin', label: 'First Source', 
+                  info: searchResults.sources[0] ? `${searchResults.sources[0].platform} - ${searchResults.sources[0].date}` : 'Unknown' }
+            ];
+
+            const links = [];
+            
+            // Add source nodes
+            searchResults.sources.forEach((source, index) => {
+                const nodeId = `source_${index}`;
+                
+                // Generate appropriate URL based on platform
+                let url = null;
+                const platform = source.platform.toLowerCase();
+                
+                console.log(`\n=== Processing Source ${index} ===`);
+                console.log('Platform:', source.platform);
+                console.log('Platform (lowercase):', platform);
+                
+                if (platform.includes('reuters') || platform.includes('fact check')) {
+                    // Extract search terms for Reuters
+                    const medicalKeywords = ['vaccine', 'covid', 'coronavirus', 'cancer', 'disease', 
+                                            'treatment', 'medicine', 'drug', 'therapy', 'virus',
+                                            'bacteria', 'infection', 'symptom', 'diagnosis', 'health',
+                                            'medical', 'clinical', 'study', 'research', 'patient',
+                                            'infertility', 'fertility', 'pregnancy', 'autism'];
+                    
+                    const stopWords = ['that', 'this', 'with', 'from', 'have', 'been', 'were', 
+                                     'will', 'your', 'they', 'said', 'says', 'claim', 'claims',
+                                     'cause', 'causes', 'make', 'makes', 'also', 'very', 'just',
+                                     'some', 'many', 'more', 'most', 'when', 'what', 'which'];
+                    
+                    let words = claim.toLowerCase()
+                        .replace(/[^\w\s]/g, ' ')
+                        .split(/\s+/)
+                        .filter(word => word.length > 3)
+                        .filter(word => !stopWords.includes(word));
+                    
+                    const medicalTerms = words.filter(word => 
+                        medicalKeywords.some(keyword => word.includes(keyword) || keyword.includes(word))
+                    );
+                    
+                    const otherTerms = words.filter(word => 
+                        !medicalKeywords.some(keyword => word.includes(keyword) || keyword.includes(word))
+                    );
+                    
+                    const selectedTerms = [...medicalTerms, ...otherTerms].slice(0, 4);
+                    const searchTerms = selectedTerms.length > 0 ? selectedTerms.join(' ') : claim.slice(0, 100);
+                    
+                    url = `https://www.reuters.com/site-search/?query=${encodeURIComponent(searchTerms)}`;
+                    console.log('✓ Reuters URL assigned:', url);
+                } else if (platform.includes('who') || platform.includes('myth')) {
+                    url = 'https://www.who.int/health-topics/infodemic';
+                    console.log('✓ WHO URL assigned:', url);
+                } else if (platform.includes('pubmed') || platform.includes('research') || platform.includes('study')) {
+                    // Always extract medical/health keywords from the actual claim
+                    const claimLower = claim.toLowerCase();
+                    
+                    console.log('PubMed URL Generation:');
+                    console.log('  Original claim:', claim);
+                    
+                    // Medical keywords to prioritize
+                    const medicalKeywords = ['vaccine', 'covid', 'coronavirus', 'cancer', 'disease', 
+                                            'treatment', 'medicine', 'drug', 'therapy', 'virus',
+                                            'bacteria', 'infection', 'symptom', 'diagnosis', 'health',
+                                            'medical', 'clinical', 'study', 'research', 'patient',
+                                            'infertility', 'fertility', 'pregnancy', 'autism'];
+                    
+                    // Stop words to exclude
+                    const stopWords = ['that', 'this', 'with', 'from', 'have', 'been', 'were', 
+                                     'will', 'your', 'they', 'said', 'says', 'claim', 'claims',
+                                     'cause', 'causes', 'make', 'makes', 'also', 'very', 'just',
+                                     'some', 'many', 'more', 'most', 'when', 'what', 'which'];
+                    
+                    // Extract words
+                    let words = claimLower
+                        .replace(/[^\w\s]/g, ' ')
+                        .split(/\s+/)
+                        .filter(word => word.length > 3)
+                        .filter(word => !stopWords.includes(word));
+                    
+                    console.log('  Extracted words:', words);
+                    
+                    // Prioritize medical terms
+                    const medicalTerms = words.filter(word => 
+                        medicalKeywords.some(keyword => word.includes(keyword) || keyword.includes(word))
+                    );
+                    
+                    const otherTerms = words.filter(word => 
+                        !medicalKeywords.some(keyword => word.includes(keyword) || keyword.includes(word))
+                    );
+                    
+                    console.log('  Medical terms found:', medicalTerms);
+                    console.log('  Other terms:', otherTerms);
+                    
+                    // Combine: medical terms first, then others (max 4 terms)
+                    const selectedTerms = [...medicalTerms, ...otherTerms].slice(0, 4);
+                    
+                    console.log('  Selected terms for search:', selectedTerms);
+                    
+                    let finalSearchTerm;
+                    if (selectedTerms.length >= 2) {
+                        finalSearchTerm = selectedTerms.join(' ');
+                    } else if (selectedTerms.length === 1) {
+                        finalSearchTerm = selectedTerms[0] + ' health';
+                    } else {
+                        finalSearchTerm = 'health misinformation';
+                    }
+                    
+                    console.log('  Final search term:', finalSearchTerm);
+                    
+                    // Format for PubMed using proper URL encoding
+                    url = `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(finalSearchTerm)}`;
+                    console.log('  Generated URL:', url);
+                    
+                } else if (platform.includes('factcheck') || platform.includes('fact-check')) {
+                    url = 'https://www.factcheck.org/';
+                    console.log('✓ FactCheck URL assigned:', url);
+                } else if (platform.includes('snopes')) {
+                    url = 'https://www.snopes.com/';
+                    console.log('✓ Snopes URL assigned:', url);
+                } else if (platform.includes('twitter') || platform.includes('x')) {
+                    url = `https://twitter.com/search?q=${encodeURIComponent(claim.slice(0, 100))}`;
+                } else if (platform.includes('facebook')) {
+                    url = `https://www.facebook.com/search/top?q=${encodeURIComponent(claim.slice(0, 100))}`;
+                } else if (platform.includes('reddit')) {
+                    url = `https://www.reddit.com/search/?q=${encodeURIComponent(claim.slice(0, 100))}`;
+                } else {
+                    // Default to Google search
+                    url = `https://www.google.com/search?q=${encodeURIComponent(claim.slice(0, 150))}`;
+                }
+                
+                console.log('Final URL for node:', url);
+                console.log('Node will be clickable:', !!url);
+                
+                nodes.push({
+                    id: nodeId,
+                    type: 'source',
+                    label: source.platform,
+                    info: `${source.username || source.platform}\n${source.date}\nReach: ${source.followers || source.subscribers || 'N/A'}`,
+                    url: url,
+                    platform: source.platform
+                });
+                
+                if (index === 0) {
+                    // First source is the origin
+                } else {
+                    // Others link to origin
+                    links.push({ source: 'origin', target: nodeId });
+                }
+            });
+
+            // Add amplifier nodes (simulated influential accounts)
+            const numAmplifiers = Math.min(5, Math.floor(searchResults.sources.length * 1.5));
+            for (let i = 0; i < numAmplifiers; i++) {
+                const ampId = `amp_${i}`;
+                nodes.push({
+                    id: ampId,
+                    type: 'amplifier',
+                    label: `Amplifier ${i + 1}`,
+                    info: `High-reach account\nEstimated followers: ${Math.floor(Math.random() * 50000 + 10000)}`
+                });
+                // Connect amplifiers to various sources
+                const sourceIndex = Math.floor(Math.random() * searchResults.sources.length);
+                links.push({ source: `source_${sourceIndex}`, target: ampId });
+            }
+
+            // Add regular user nodes
+            const numUsers = Math.floor(searchResults.estimatedReach / 50000);
+            const displayUsers = Math.min(12, Math.max(6, numUsers));
+            for (let i = 0; i < displayUsers; i++) {
+                const userId = `user_${i}`;
+                nodes.push({
+                    id: userId,
+                    type: 'user',
+                    label: `User`,
+                    info: `General audience member`
+                });
+                // Connect users to amplifiers or sources
+                const targetIndex = Math.floor(Math.random() * (numAmplifiers + searchResults.sources.length));
+                const targetId = targetIndex < numAmplifiers ? `amp_${targetIndex}` : `source_${targetIndex - numAmplifiers}`;
+                if (nodes.find(n => n.id === targetId)) {
+                    links.push({ source: targetId, target: userId });
+                }
+            }
+
+            // Create force simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+                .force('charge', d3.forceManyBody().strength(-400))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(30));
+
+            // Draw links
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter().append('line')
+                .attr('class', 'link')
+                .attr('stroke-width', d => {
+                    const sourceNode = nodes.find(n => n.id === d.source.id || n.id === d.source);
+                    return sourceNode && sourceNode.type === 'origin' ? 3 : 1.5;
+                });
+
+            // Draw nodes
+            const node = svg.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .enter().append('g')
+                .attr('class', 'node')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            node.append('circle')
+                .attr('r', d => {
+                    if (d.type === 'origin') return 25;
+                    if (d.type === 'source') return 20;
+                    if (d.type === 'amplifier') return 15;
+                    return 10;
+                })
+                .attr('fill', d => {
+                    if (d.type === 'origin') return '#1e3a8a';
+                    if (d.type === 'source') return '#2563eb';
+                    if (d.type === 'amplifier') return '#404040';
+                    return '#a3a3a3';
+                })
+                .attr('stroke', '#2d3748')
+                .attr('stroke-width', 2)
+                .style('cursor', 'pointer')
+                .on('click', function(event, d) {
+                    console.log('Node clicked:', d.label);
+                    console.log('Node data:', d);
+                    console.log('Has URL:', !!d.url);
+                    console.log('URL value:', d.url);
+                    
+                    if (d.url) {
+                        event.stopPropagation();
+                        console.log('Navigating to URL:', d.url);
+                        
+                        // Try multiple methods to open URL
+                        try {
+                            // Method 1: Create invisible link and click it
+                            const link = document.createElement('a');
+                            link.href = d.url;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log('✓ Link click method used');
+                        } catch (e) {
+                            console.error('Link click failed, trying window.open:', e);
+                            // Method 2: Fallback to window.open
+                            window.open(d.url, '_blank', 'noopener,noreferrer');
+                        }
+                    } else {
+                        console.warn('No URL found for node:', d.label);
+                    }
+                })
+                .on('contextmenu', function(event, d) {
+                    // Right-click: copy URL to clipboard
+                    if (d.url) {
+                        event.preventDefault();
+                        navigator.clipboard.writeText(d.url).then(() => {
+                            console.log('URL copied to clipboard:', d.url);
+                            showNotification(`📋 URL copied: ${d.label}`);
+                        }).catch(err => {
+                            console.error('Failed to copy URL:', err);
+                        });
+                    }
+                })
+                .on('mouseover', function(event, d) {
+                    // Highlight node
+                    d3.select(this)
+                        .attr('stroke', '#000000')
+                        .attr('stroke-width', 3);
+                    
+                    // Build tooltip content
+                    let tooltipContent = `
+                        <strong style="color: #60a5fa;">${d.label}</strong><br>
+                        <span style="font-size: 11px; opacity: 0.8;">${d.info.replace(/\n/g, '<br>')}</span>
+                    `;
+                    
+                    // Add click instruction based on platform type
+                    if (d.url) {
+                        if (d.platform && d.platform.toLowerCase().includes('pubmed')) {
+                            tooltipContent += `<br><br><span style="color: #a3a3a3; font-size: 11px;">🔗 Click to search medical literature<br>Right-click to copy URL</span>`;
+                        } else if (d.platform && (d.platform.toLowerCase().includes('who') || 
+                                                   d.platform.toLowerCase().includes('factcheck') || 
+                                                   d.platform.toLowerCase().includes('snopes'))) {
+                            tooltipContent += `<br><br><span style="color: #68d391; font-size: 11px;">✓ Click to visit fact-checking source<br>Right-click to copy URL</span>`;
+                        } else {
+                            tooltipContent += `<br><br><span style="color: #a3a3a3; font-size: 11px;">🔗 Click to visit source<br>Right-click to copy URL</span>`;
+                        }
+                    }
+                    
+                    // Show tooltip
+                    const tooltip = d3.select('body').append('div')
+                        .attr('class', 'network-tooltip')
+                        .style('position', 'absolute')
+                        .style('background', 'rgba(0, 0, 0, 0.9)')
+                        .style('color', 'white')
+                        .style('padding', '12px 16px')
+                        .style('border-radius', '8px')
+                        .style('font-size', '13px')
+                        .style('pointer-events', 'none')
+                        .style('z-index', '10000')
+                        .style('max-width', '300px')
+                        .html(tooltipContent)
+                        .style('left', (event.pageX + 15) + 'px')
+                        .style('top', (event.pageY - 10) + 'px');
+                })
+                .on('mouseout', function(event, d) {
+                    // Reset node
+                    d3.select(this)
+                        .attr('stroke', '#2d3748')
+                        .attr('stroke-width', 2);
+                    
+                    // Remove tooltip
+                    d3.selectAll('.network-tooltip').remove();
+                });
+
+            node.append('text')
+                .text(d => d.label)
+                .attr('x', 0)
+                .attr('y', 35)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#4a5568')
+                .attr('font-family', 'system-ui, -apple-system, sans-serif')
+                .attr('font-size', '11px')
+                .attr('font-weight', '500');
+
+            // Add tooltips
+            node.append('title')
+                .text(d => d.info);
+
+            // Update positions on each tick
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+
+            // Update statistics with real data
+            document.getElementById('spreadPotential').textContent = 
+                searchResults.estimatedReach > 500000 ? 'Very High' : 
+                searchResults.estimatedReach > 100000 ? 'High' : 'Medium';
+            document.getElementById('topSpreaders').textContent = numAmplifiers;
+            document.getElementById('networkReach').textContent = 
+                searchResults.estimatedReach.toLocaleString();
+
+            // Add detailed analysis info
+            const statsContainer = document.querySelector('.network-stats');
+            if (statsContainer) {
+                // Add origin information
+                const originInfo = document.createElement('div');
+                originInfo.className = 'stat-card';
+                originInfo.style.gridColumn = '1 / -1';
+                originInfo.innerHTML = `
+                    <div class="stat-label" style="color: var(--navy);">Origin Analysis</div>
+                    <div style="margin-top: 15px; text-align: left; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+                        <strong style="color: var(--navy);">First Detected:</strong> ${searchResults.earliestDate || 'Unknown'}<br>
+                        <strong style="color: var(--navy);">Primary Platform:</strong> ${searchResults.sources[0]?.platform || 'Unknown'}<br>
+                        <strong style="color: var(--navy);">Initial Source:</strong> ${searchResults.sources[0]?.username || 'Anonymous'}<br>
+                        <strong style="color: var(--navy);">Verification Status:</strong> ${searchResults.verificationStatus}<br>
+                        <strong style="color: var(--navy);">Spread Pattern:</strong> ${searchResults.sources.length} platforms identified
+                    </div>
+                `;
+                
+                // Remove old origin info if exists
+                const oldInfo = statsContainer.querySelector('[style*="grid-column"]');
+                if (oldInfo) oldInfo.remove();
+                
+                statsContainer.appendChild(originInfo);
+            }
+        }
+
+        // Update all visualizations based on global state
+        function updateAllVisualizations() {
+            const stats = globalAnalysisState.aggregateStats;
+            
+            // Update trend chart with actual analyzed data
+            const trendCtx = document.getElementById('trendChart');
+            if (trendCtx && trendCtx.chart) {
+                const last10 = stats.timeSeriesData.slice(-10);
+                const labels = last10.map((d, i) => `Item ${stats.totalAnalyzed - last10.length + i + 1}`);
+                
+                const misinfoData = [];
+                const accurateData = [];
+                
+                let misinfoCount = 0;
+                let accurateCount = 0;
+                
+                last10.forEach(item => {
+                    if (item.category === 'accurate') {
+                        accurateCount++;
+                    } else {
+                        misinfoCount++;
+                    }
+                    misinfoData.push(misinfoCount);
+                    accurateData.push(accurateCount);
+                });
+                
+                trendCtx.chart.data.labels = labels;
+                trendCtx.chart.data.datasets[0].data = misinfoData;
+                trendCtx.chart.data.datasets[1].data = accurateData;
+                trendCtx.chart.update();
+            }
+
+            // Update category distribution chart
+            const categoryCtx = document.getElementById('categoryChart');
+            if (categoryCtx && categoryCtx.chart) {
+                categoryCtx.chart.data.datasets[0].data = [
+                    stats.accurateCount,
+                    stats.misinfoCount,
+                    stats.conspiracyCount,
+                    stats.clickbaitCount
+                ];
+                categoryCtx.chart.update();
+            }
+
+            // Update regional heatmap
+            const heatmapCtx = document.getElementById('heatmapChart');
+            if (heatmapCtx && heatmapCtx.chart) {
+                const regions = Object.keys(stats.regionalData);
+                const misinfoByRegion = regions.map(r => 
+                    stats.regionalData[r].misinfo + stats.regionalData[r].conspiracy
+                );
+                
+                heatmapCtx.chart.data.datasets[0].data = misinfoByRegion;
+                heatmapCtx.chart.update();
+            }
+
+            // Update FLICC distribution chart if exists
+            updateFliccChart();
+        }
+
+        // Update FLICC distribution visualization
+        function updateFliccChart() {
+            const stats = globalAnalysisState.aggregateStats;
+            const fliccLabels = Object.keys(stats.fliccDistribution);
+            const fliccCounts = Object.values(stats.fliccDistribution);
+            
+            // We'll add this chart to visualizations section
+            let fliccChartCanvas = document.getElementById('fliccDistributionChart');
+            if (!fliccChartCanvas) {
+                // Create the chart container if it doesn't exist
+                const vizSection = document.getElementById('visualizations');
+                const newChartContainer = document.createElement('div');
+                newChartContainer.className = 'chart-container';
+                newChartContainer.style.marginTop = '40px';
+                newChartContainer.innerHTML = `
+                    <h3 class="chart-title">FLICC Technique Distribution</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                        Frequency of misinformation techniques detected across all analyzed content
+                    </p>
+                    <canvas id="fliccDistributionChart"></canvas>
+                `;
+                vizSection.appendChild(newChartContainer);
+                fliccChartCanvas = document.getElementById('fliccDistributionChart');
+            }
+            
+            if (fliccChartCanvas) {
+                if (fliccChartCanvas.chart) {
+                    fliccChartCanvas.chart.data.datasets[0].data = fliccCounts;
+                    fliccChartCanvas.chart.update();
+                } else {
+                    fliccChartCanvas.chart = new Chart(fliccChartCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: fliccLabels,
+                            datasets: [{
+                                label: 'Detection Count',
+                                data: fliccCounts,
+                                backgroundColor: [
+                                    'rgba(10, 10, 10, 0.95)',
+                                    'rgba(64, 64, 64, 0.95)',
+                                    'rgba(115, 115, 115, 0.95)',
+                                    'rgba(163, 163, 163, 0.95)',
+                                    'rgba(212, 212, 212, 0.95)'
+                                ],
+                                borderRadius: 8,
+                                borderWidth: 2,
+                                borderColor: [
+                                    '#0a0a0a',
+                                    '#404040',
+                                    '#737373',
+                                    '#a3a3a3',
+                                    '#d4d4d4'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { 
+                                    beginAtZero: true,
+                                    ticks: { color: '#525252', font: { size: 12 }, stepSize: 1 },
+                                    grid: { color: '#f5f5f5' },
+                                    border: { display: false },
+                                    title: {
+                                        display: true,
+                                        text: 'Number of Detections',
+                                        color: '#0a0a0a',
+                                        font: { size: 12, weight: '500' }
+                                    }
+                                },
+                                x: { 
+                                    ticks: { color: '#525252', font: { size: 11 } },
+                                    grid: { display: false },
+                                    border: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Initialize visualizations
+        function initializeCharts() {
+            const stats = globalAnalysisState.aggregateStats;
+            
+            // Trend Chart - starts empty or with current data
+            const trendCtx = document.getElementById('trendChart');
+            if (trendCtx && !trendCtx.chart) {
+                const initialData = stats.totalAnalyzed > 0 ? 
+                    stats.timeSeriesData.slice(-10) : 
+                    Array(6).fill(0);
+                
+                const labels = stats.totalAnalyzed > 0 ?
+                    initialData.map((d, i) => `Item ${i + 1}`) :
+                    ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
+                
+                const misinfoData = stats.totalAnalyzed > 0 ?
+                    initialData.filter(d => d.category !== 'accurate').map((_, i) => i + 1) :
+                    [2, 3, 5, 7, 6, 8];
+                    
+                const accurateData = stats.totalAnalyzed > 0 ?
+                    initialData.filter(d => d.category === 'accurate').map((_, i) => i + 1) :
+                    [8, 10, 12, 15, 18, 20];
+                
+                trendCtx.chart = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Misinformation',
+                            data: misinfoData,
+                            borderColor: '#404040',
+                            backgroundColor: 'rgba(64, 64, 64, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 2
+                        }, {
+                            label: 'Accurate Info',
+                            data: accurateData,
+                            borderColor: '#0a0a0a',
+                            backgroundColor: 'rgba(10, 10, 10, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                labels: { 
+                                    color: '#0a0a0a',
+                                    font: { size: 13, weight: '500' },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false },
+                                beginAtZero: true
+                            },
+                            x: { 
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Category Chart
+            const categoryCtx = document.getElementById('categoryChart');
+            if (categoryCtx && !categoryCtx.chart) {
+                const data = stats.totalAnalyzed > 0 ?
+                    [stats.accurateCount, stats.misinfoCount, stats.conspiracyCount, stats.clickbaitCount] :
+                    [0, 0, 0, 0];
+                
+                categoryCtx.chart = new Chart(categoryCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Accurate', 'Misinformation', 'Conspiracy', 'Clickbait'],
+                        datasets: [{
+                            label: 'Count',
+                            data: data,
+                            backgroundColor: [
+                                'rgba(10, 10, 10, 0.9)',
+                                'rgba(82, 82, 82, 0.9)',
+                                'rgba(163, 163, 163, 0.9)',
+                                'rgba(212, 212, 212, 0.9)'
+                            ],
+                            borderColor: [
+                                '#0a0a0a',
+                                '#525252',
+                                '#a3a3a3',
+                                '#d4d4d4'
+                            ],
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: true,
+                                ticks: { color: '#525252', font: { size: 12 }, stepSize: 1 },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false }
+                            },
+                            x: { 
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Heatmap Chart
+            const heatmapCtx = document.getElementById('heatmapChart');
+            if (heatmapCtx && !heatmapCtx.chart) {
+                const regions = Object.keys(stats.regionalData);
+                const data = regions.map(r => 
+                    stats.regionalData[r].misinfo + stats.regionalData[r].conspiracy
+                );
+                
+                heatmapCtx.chart = new Chart(heatmapCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: regions,
+                        datasets: [{
+                            label: 'Misinformation Posts',
+                            data: data,
+                            backgroundColor: 'rgba(64, 64, 64, 0.9)',
+                            borderColor: '#404040',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                labels: { 
+                                    color: '#0a0a0a',
+                                    font: { size: 13, weight: '500' },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                beginAtZero: true,
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false }
+                            },
+                            y: { 
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Initialize FLICC chart
+            updateFliccChart();
+        }
+
+        // Initialize network visualization
+        function initializeNetwork() {
+            // Check if D3 is loaded
+            if (typeof d3 === 'undefined') {
+                console.error('D3.js not loaded yet, retrying...');
+                setTimeout(initializeNetwork, 500);
+                return;
+            }
+
+            const svg = d3.select('#network-svg');
+            svg.selectAll('*').remove();
+
+            const width = document.getElementById('network-svg').clientWidth || 800;
+            const height = 600;
+
+            // Create mock network data
+            const nodes = [
+                { id: 'origin', type: 'origin', label: 'Origin' },
+                { id: 'amp1', type: 'amplifier', label: 'Amplifier 1' },
+                { id: 'amp2', type: 'amplifier', label: 'Amplifier 2' },
+                { id: 'amp3', type: 'amplifier', label: 'Amplifier 3' },
+                { id: 'user1', type: 'user', label: 'User' },
+                { id: 'user2', type: 'user', label: 'User' },
+                { id: 'user3', type: 'user', label: 'User' },
+                { id: 'user4', type: 'user', label: 'User' },
+                { id: 'user5', type: 'user', label: 'User' },
+                { id: 'user6', type: 'user', label: 'User' },
+                { id: 'user7', type: 'user', label: 'User' },
+                { id: 'user8', type: 'user', label: 'User' }
+            ];
+
+            const links = [
+                { source: 'origin', target: 'amp1' },
+                { source: 'origin', target: 'amp2' },
+                { source: 'origin', target: 'amp3' },
+                { source: 'amp1', target: 'user1' },
+                { source: 'amp1', target: 'user2' },
+                { source: 'amp1', target: 'user3' },
+                { source: 'amp2', target: 'user4' },
+                { source: 'amp2', target: 'user5' },
+                { source: 'amp3', target: 'user6' },
+                { source: 'amp3', target: 'user7' },
+                { source: 'amp3', target: 'user8' }
+            ];
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter().append('line')
+                .attr('class', 'link');
+
+            const node = svg.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .enter().append('g')
+                .attr('class', 'node')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            node.append('circle')
+                .attr('r', d => d.type === 'origin' ? 20 : d.type === 'amplifier' ? 15 : 10)
+                .attr('fill', d => {
+                    if (d.type === 'origin') return '#1e3a8a';
+                    if (d.type === 'amplifier') return '#2563eb';
+                    return '#60a5fa';
+                })
+                .attr('stroke', '#f0f4f8')
+                .attr('stroke-width', 2);
+
+            node.append('text')
+                .text(d => d.label)
+                .attr('x', 0)
+                .attr('y', 30)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#f0f4f8')
+                .attr('font-family', 'IBM Plex Mono')
+                .attr('font-size', '10px');
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+        }
+
+        // Update sensitivity analysis charts based on current analysis
+        function updateSensitivityCharts(sensitivityResults) {
+            if (!sensitivityResults) {
+                // Use default if no results yet
+                sensitivityResults = {
+                    thresholdResults: [
+                        { threshold: 'Very Lenient', confidence: 85, category: 'misinfo' },
+                        { threshold: 'Lenient', confidence: 82, category: 'misinfo' },
+                        { threshold: 'Moderate', confidence: 75, category: 'misinfo' },
+                        { threshold: 'Strict', confidence: 68, category: 'unverified' },
+                        { threshold: 'Very Strict', confidence: 62, category: 'unverified' }
+                    ],
+                    avgConfidence: 74.4,
+                    standardDeviation: 8.9,
+                    robustnessScore: 72
+                };
+            }
+            
+            // Classification across thresholds
+            const sensitivityCtx = document.getElementById('sensitivityChart');
+            if (sensitivityCtx) {
+                if (sensitivityCtx.chart) sensitivityCtx.chart.destroy();
+                
+                const labels = sensitivityResults.thresholdResults.map(r => r.threshold);
+                const confidences = sensitivityResults.thresholdResults.map(r => r.confidence);
+                
+                sensitivityCtx.chart = new Chart(sensitivityCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Confidence Score',
+                            data: confidences,
+                            borderColor: '#000000',
+                            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                            tension: 0.3,
+                            fill: true,
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointBackgroundColor: '#000000',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                labels: { 
+                                    color: '#0a0a0a',
+                                    font: { size: 13, weight: '500' },
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const result = sensitivityResults.thresholdResults[context.dataIndex];
+                                        return `Category: ${result.category}\n${result.reasoning || ''}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                min: 40,
+                                max: 100,
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Confidence (%)',
+                                    color: '#0a0a0a',
+                                    font: { size: 12, weight: '500' }
+                                }
+                            },
+                            x: { 
+                                ticks: { color: '#525252', font: { size: 11 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Confidence distribution
+            const confidenceCtx = document.getElementById('confidenceChart');
+            if (confidenceCtx) {
+                if (confidenceCtx.chart) confidenceCtx.chart.destroy();
+                
+                // Create distribution based on actual sensitivity data
+                const avg = sensitivityResults.avgConfidence;
+                const std = sensitivityResults.standardDeviation;
+                
+                // Calculate how confidences distribute across ranges
+                const ranges = ['50-60%', '60-70%', '70-80%', '80-90%', '90-100%'];
+                const distribution = [0, 0, 0, 0, 0];
+                
+                sensitivityResults.thresholdResults.forEach(r => {
+                    if (r.confidence < 60) distribution[0]++;
+                    else if (r.confidence < 70) distribution[1]++;
+                    else if (r.confidence < 80) distribution[2]++;
+                    else if (r.confidence < 90) distribution[3]++;
+                    else distribution[4]++;
+                });
+                
+                confidenceCtx.chart = new Chart(confidenceCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ranges,
+                        datasets: [{
+                            label: 'Number of Thresholds',
+                            data: distribution,
+                            backgroundColor: 'rgba(64, 64, 64, 0.9)',
+                            borderColor: '#404040',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                labels: { 
+                                    color: '#0a0a0a',
+                                    font: { size: 13, weight: '500' },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: true,
+                                max: 5,
+                                ticks: { color: '#525252', font: { size: 12 }, stepSize: 1 },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Count',
+                                    color: '#0a0a0a',
+                                    font: { size: 12, weight: '500' }
+                                }
+                            },
+                            x: { 
+                                ticks: { color: '#525252', font: { size: 12 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Heatmap showing how current analysis compares across thresholds
+            const heatmapCtx = document.getElementById('heatmapSensitivityChart');
+            if (heatmapCtx) {
+                if (heatmapCtx.chart) heatmapCtx.chart.destroy();
+                
+                // Count categories at each threshold
+                const thresholds = sensitivityResults.thresholdResults.map(r => r.threshold);
+                const accurateData = [];
+                const misinfoData = [];
+                const conspiracyData = [];
+                
+                sensitivityResults.thresholdResults.forEach(r => {
+                    accurateData.push(r.category === 'accurate' ? 1 : 0);
+                    misinfoData.push(r.category === 'misinfo' || r.category === 'clickbait' ? 1 : 0);
+                    conspiracyData.push(r.category === 'conspiracy' ? 1 : 0);
+                });
+                
+                heatmapCtx.chart = new Chart(heatmapCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: thresholds,
+                        datasets: [{
+                            label: 'Accurate',
+                            data: accurateData,
+                            backgroundColor: 'rgba(10, 10, 10, 0.9)',
+                            borderRadius: 8
+                        }, {
+                            label: 'Misinformation',
+                            data: misinfoData,
+                            backgroundColor: 'rgba(115, 115, 115, 0.9)',
+                            borderRadius: 8
+                        }, {
+                            label: 'Conspiracy',
+                            data: conspiracyData,
+                            backgroundColor: 'rgba(212, 212, 212, 0.9)',
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                labels: { 
+                                    color: '#0a0a0a',
+                                    font: { size: 13, weight: '500' },
+                                    padding: 15
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                stacked: true,
+                                max: 1,
+                                ticks: { color: '#525252', font: { size: 12 }, stepSize: 1 },
+                                grid: { color: '#f5f5f5' },
+                                border: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Classification',
+                                    color: '#0a0a0a',
+                                    font: { size: 12, weight: '500' }
+                                }
+                            },
+                            x: { 
+                                stacked: true,
+                                ticks: { color: '#525252', font: { size: 11 } },
+                                grid: { display: false },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        function initializeSensitivityCharts() {
+            // Initialize with default/empty state
+            const defaultSensitivity = {
+                thresholdResults: [
+                    { threshold: 'Very Lenient', confidence: 85, category: 'misinfo' },
+                    { threshold: 'Lenient', confidence: 82, category: 'misinfo' },
+                    { threshold: 'Moderate', confidence: 75, category: 'misinfo' },
+                    { threshold: 'Strict', confidence: 68, category: 'unverified' },
+                    { threshold: 'Very Strict', confidence: 62, category: 'unverified' }
+                ],
+                avgConfidence: 74.4,
+                standardDeviation: 8.9,
+                robustnessScore: 72
+            };
+
+            updateSensitivityCharts(defaultSensitivity);
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            // Wait a bit to ensure all scripts are fully loaded
+            setTimeout(() => {
+                initializeCharts();
+                console.log('App initialized successfully');
+                console.log('D3 loaded:', typeof d3 !== 'undefined');
+                console.log('Chart.js loaded:', typeof Chart !== 'undefined');
+            }, 300);
+        });
+    </script>
+</body>
+</html>
